@@ -25,7 +25,8 @@ enum Commands {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let _config = match cli.target {
-        Some(target) => mqp::Config::load(target)?,
+        Some(target) => mqp::Config::load(&target)
+            .with_context(|| format!("Invalid target directory '{}'", target))?,
         None => {
             let cur = std::env::current_dir()?;
             mqp::Config::find(&cur)
