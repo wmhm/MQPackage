@@ -35,6 +35,8 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - name: Install Scoop
+        run: iwr -useb get.scoop.sh | iex
       - name: Install sscache
         run: scoop install sccache
       - uses: actions-rs/cargo@v1
