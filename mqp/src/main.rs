@@ -1,6 +1,8 @@
 // This file is dual licensed under the terms of the Apache License, Version
 // 2.0, and the BSD License. See the LICENSE file in the root of this repository
 // for complete details.
+
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
@@ -20,12 +22,20 @@ enum Commands {
     Upgrade {},
 }
 
-fn main() {
+fn main() -> Result<()> {
     let cli = Cli::parse();
+    let _config = match cli.target {
+        Some(target) => mqp::Config::load(target)?,
+        None => {
+            let cur = std::env::current_dir()?;
+            mqp::Config::find(&cur)
+                .with_context(|| format!("Unable to find target dir from '{}'", cur.display()))?
+        }
+    };
 
     match &cli.command {
-        Commands::Install {} => {}
-        Commands::Uninstall {} => {}
-        Commands::Upgrade {} => {}
+        Commands::Install {} => Ok(()),
+        Commands::Uninstall {} => Ok(()),
+        Commands::Upgrade {} => Ok(()),
     }
 }
