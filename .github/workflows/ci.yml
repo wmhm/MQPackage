@@ -15,14 +15,17 @@ jobs:
     name: Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           components: rustfmt
           override: true
-      - uses: actions-rs/cargo@v1
+      - name: Format
+        uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: --all -- --check
@@ -31,16 +34,22 @@ jobs:
   lint:
     name: Lint
     runs-on: windows-latest
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           components: clippy
           override: true
-      - uses: Swatinem/rust-cache@v1
-      - uses: actions-rs/cargo@v1
+      - name: Cache
+        uses: Swatinem/rust-cache@v1
+      - name: Lint
+        uses: actions-rs/cargo@v1
         with:
           command: clippy
           args: -- -D warnings
@@ -49,30 +58,48 @@ jobs:
   check:
     name: Check
     runs-on: windows-latest
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
-      - uses: Swatinem/rust-cache@v1
-      - uses: actions-rs/cargo@v1
+      - name: Cache
+        uses: Swatinem/rust-cache@v1
+      - name: Check
+        uses: actions-rs/cargo@v1
         with:
           command: check
+          args: --locked
 
 
   test:
     name: Test
     runs-on: windows-latest
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
-      - uses: Swatinem/rust-cache@v1
-      - uses: actions-rs/cargo@v1
+      - name: Cache
+        uses: Swatinem/rust-cache@v1
+      - name: Compile
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --no-run --locked
+      - name: Test
+        uses: actions-rs/cargo@v1
         with:
           command: test
