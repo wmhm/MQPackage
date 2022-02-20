@@ -1,0 +1,20 @@
+name: Cache rustc
+description: Caches rustc output with sccache
+runs:
+  using: "composite"
+  steps:
+    - name: Install scoop
+      uses: ./.github/actions/scoop
+    - name: Install sccache
+      run: |
+        scoop install sccache
+        echo "SCCACHE_DIR=~/.sccache" >> $GITHUB_ENV
+        echo "SCCACHE_CACHE_SIZE=2G" >> $GITHUB_ENV
+        echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+    - name: Save sccache
+      uses: actions/cache@v2
+      with:
+        path: ${{ matrix.sccache-path }}
+        key: ${{ runner.os }}-sccache-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-sccache-
