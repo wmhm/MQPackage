@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use vfs::{PhysicalFS, VfsPath};
 
-use mqpkg::{find_config_dir, Config, CONFIG_FILENAME};
+use mqpkg::config::{find_config_dir, Config, CONFIG_FILENAME};
 
 #[derive(Parser, Debug)]
 #[clap(version)]
@@ -29,21 +29,20 @@ enum Commands {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let _config = match cli.target {
-        Some(target) => {
-            let root: VfsPath = PhysicalFS::new(PathBuf::from(&target)).into();
-            Config::load(root).with_context(|| format!("Invalid target directory '{}'", target))?
-        }
+    let root: VfsPath = match cli.target {
+        Some(target) => PhysicalFS::new(PathBuf::from(target)).into(),
         None => {
-            let root: VfsPath = PhysicalFS::new(find_config_dir(std::env::current_dir()?)?).into();
-            Config::load(root).with_context(|| {
+            let configdir = find_config_dir(std::env::current_dir()?).with_context(|| {
                 format!(
                     "Unable to find '{}' in current directory or parents",
                     CONFIG_FILENAME
                 )
-            })?
+            })?;
+            PhysicalFS::new(configdir).into()
         }
     };
+    let _config = Config::load(&root)
+        .with_context(|| format!("Invalid target directory '{}'", root.as_str()))?;
 
     match &cli.command {
         Commands::Install {} => Ok(()),

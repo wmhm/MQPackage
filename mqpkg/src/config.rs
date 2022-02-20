@@ -7,12 +7,29 @@ use std::str::FromStr;
 
 use serde::Deserialize;
 use serde_with::{serde_as, DisplayFromStr, PickFirst};
+use thiserror::Error;
 use url::Url;
 use vfs::VfsPath;
 
-use super::Error;
-
 pub const CONFIG_FILENAME: &str = "mqpkg.yml";
+
+#[derive(Error, Debug)]
+pub enum ConfigError {
+    #[error("no configuration file")]
+    NoConfig { source: vfs::VfsError },
+
+    #[error("invalid configuration")]
+    InvalidConfig { source: serde_yaml::Error },
+
+    #[error("invalid url")]
+    InvalidURL { source: url::ParseError },
+
+    #[error("unable to traverse directory")]
+    DirectoryTraversalError { source: vfs::VfsError },
+
+    #[error("unable to locate a valid directory")]
+    NoTargetDirectoryFound,
+}
 
 #[derive(Deserialize, Debug)]
 struct Repository {
@@ -21,10 +38,10 @@ struct Repository {
 }
 
 impl FromStr for Repository {
-    type Err = Error;
+    type Err = ConfigError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let url = Url::from_str(s).map_err(|source| Error::InvalidURL { source })?;
+        let url = Url::from_str(s).map_err(|source| ConfigError::InvalidURL { source })?;
 
         Ok(Repository { _url: url })
     }
@@ -39,20 +56,20 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load(root: VfsPath) -> Result<Config, Error> {
+    pub fn load(root: &VfsPath) -> Result<Config, ConfigError> {
         let configfile = root
             .join(CONFIG_FILENAME)
-            .map_err(|source| Error::NoConfig { source })?
+            .map_err(|source| ConfigError::NoConfig { source })?
             .open_file()
-            .map_err(|source| Error::NoConfig { source })?;
+            .map_err(|source| ConfigError::NoConfig { source })?;
         let config: Config = serde_yaml::from_reader(configfile)
-            .map_err(|source| Error::InvalidConfig { source })?;
+            .map_err(|source| ConfigError::InvalidConfig { source })?;
 
         Ok(config)
     }
 }
 
-pub fn find_config_dir<P>(path: P) -> Result<PathBuf, Error>
+pub fn find_config_dir<P>(path: P) -> Result<PathBuf, ConfigError>
 where
     P: Into<PathBuf>,
 {
@@ -67,7 +84,7 @@ where
         // Remove the filename, and the parent, and
         // if that's not successful, it's an error.
         if !(path.pop() && path.pop()) {
-            return Err(Error::NoTargetDirectoryFound);
+            return Err(ConfigError::NoTargetDirectoryFound);
         }
     }
 }
