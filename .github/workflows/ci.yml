@@ -56,6 +56,8 @@ jobs:
   check:
     name: Check
     runs-on: windows-latest
+    env:
+      CARGO_PROFILE_DEV_DEBUG=0
     steps:
       - name: Checkout
         uses: actions/checkout@v2
