@@ -9,7 +9,7 @@ runs:
       shell: pwsh
       run: |
         scoop install sccache
-        echo "SCCACHE_DIR=$HOME\.sccache" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
+        echo "SCCACHE_DIR=C:\Users\runneradmin\.sccache" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
         echo "SCCACHE_CACHE_SIZE=2G" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
         echo "RUSTC_WRAPPER=sccache" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
     - name: Save sccache
