@@ -57,12 +57,12 @@ pub struct Config {
 
 impl Config {
     pub fn load(root: &VfsPath) -> Result<Config, ConfigError> {
-        let configfile = root
+        let file = root
             .join(CONFIG_FILENAME)
             .map_err(|source| ConfigError::NoConfig { source })?
             .open_file()
             .map_err(|source| ConfigError::NoConfig { source })?;
-        let config: Config = serde_yaml::from_reader(configfile)
+        let config: Config = serde_yaml::from_reader(file)
             .map_err(|source| ConfigError::InvalidConfig { source })?;
 
         Ok(config)
