@@ -11,7 +11,7 @@ use serde_with::{serde_as, DisplayFromStr, PickFirst};
 use thiserror::Error;
 use url::Url;
 
-const CONFIG_FILENAME: &str = "MQPackage.yml";
+const CONFIG_FILENAME: &str = "mqpkg.yml";
 
 #[derive(Error, Debug)]
 pub enum MQPackageError {
