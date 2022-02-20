@@ -73,6 +73,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/cache-rustc
+        with:
+          type: lint
       - uses: ./.github/actions/cache-cargo
       - uses: actions-rs/toolchain@v1
         with:
