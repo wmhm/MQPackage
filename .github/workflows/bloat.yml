@@ -29,5 +29,5 @@ jobs:
         uses: orf/cargo-bloat-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          bloat_args: --locked
-          tree_args: --locked
+          bloat_args: --release --locked
+          tree_args: --release --locked
