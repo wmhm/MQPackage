@@ -1,13 +1,13 @@
 [package]
-name = "mqp-cli"
+name = "mqpkg-cli"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "mqp"
+name = "mqpkg"
 path = "src/main.rs"
 
 [dependencies]
-mqp = { path = "../mqp" }
+mqpkg = { path = "../mqpkg" }
 anyhow = "1.0"
 clap = { version = "3.1.0", features = ["derive"] }

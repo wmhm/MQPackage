@@ -1,5 +1,5 @@
 [workspace]
 members = [
-    "mqp",
-    "mqp-cli",
+    "mqpkg",
+    "mqpkg-cli",
 ]
