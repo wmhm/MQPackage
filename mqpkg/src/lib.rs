@@ -8,13 +8,13 @@ use std::str::FromStr;
 
 use serde::Deserialize;
 use serde_with::{serde_as, DisplayFromStr, PickFirst};
-use thiserror::Error;
+use thiserror::Error as BaseError;
 use url::Url;
 
 const CONFIG_FILENAME: &str = "mqpkg.yml";
 
-#[derive(Error, Debug)]
-pub enum MQPackageError {
+#[derive(BaseError, Debug)]
+pub enum Error {
     #[error("no configuration file")]
     NoConfig {
         #[from]
@@ -44,10 +44,10 @@ struct Repository {
 }
 
 impl FromStr for Repository {
-    type Err = MQPackageError;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let url = Url::from_str(s).map_err(|source| MQPackageError::InvalidURL { source })?;
+        let url = Url::from_str(s).map_err(|source| Error::InvalidURL { source })?;
 
         Ok(Repository { _url: url })
     }
@@ -71,19 +71,19 @@ impl Config {
 }
 
 impl Config {
-    pub fn load<P>(path: P) -> Result<Config, MQPackageError>
+    pub fn load<P>(path: P) -> Result<Config, Error>
     where
         P: AsRef<Path>,
     {
         let target = dunce::canonicalize(path)?;
         let configfile = File::open(target.join(CONFIG_FILENAME))
-            .map_err(|source| MQPackageError::NoConfig { source })?;
+            .map_err(|source| Error::NoConfig { source })?;
         let config: Config = serde_yaml::from_reader(configfile)?;
 
         Ok(Config { target, ..config })
     }
 
-    pub fn find<P>(path: P) -> Result<Config, MQPackageError>
+    pub fn find<P>(path: P) -> Result<Config, Error>
     where
         P: Into<PathBuf>,
     {
@@ -98,7 +98,7 @@ impl Config {
             // Remove the filename, and the parent, and
             // if that's not successful, it's an error.
             if !(path.pop() && path.pop()) {
-                return Err(MQPackageError::NoTargetDirectoryFound);
+                return Err(Error::NoTargetDirectoryFound);
             }
         };
 
