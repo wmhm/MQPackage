@@ -130,7 +130,8 @@ the following operations:
 - ``*`` - Wildcard, this is basically the same as ``=`` with less than 3 digits,
           so ``I.J.*`` is the same as ``=I.J``.
 
-For more details, you can check out the Rust [Version Op page](https://docs.rs/semver/latest/semver/enum.Op.html).
+For more details, you can check out the Rust
+[Version Op page](https://docs.rs/semver/latest/semver/enum.Op.html).
 
 ### config_files (Optional)
 
