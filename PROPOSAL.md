@@ -44,28 +44,10 @@ these problems.
 
 ## Format
 
-TODO: Should we use a different extension besides .zip? A different extension would make
-      it easier to differentiate, between package files and random zip files. However
-      the .zip extension makes it easier for people to still manually install these. We
-      could split the different and do something like .mq.zip as the extension.
-
-TODO: Is there any reason to use either bzip2 or lzma compression? I think that only some
-      tools support that, so it possibly makes it harder to manually install these package
-      files, but it could also produce smaller packages. Would have to test it.
-
-TODO: If we decide to use an extension, we should come up with a name for these package files
-      and we might want to do that regardless. For instance the pkgdb directory could be named
-      after that instead.
-
-TODO: zip files compress members individually, a common packaging trick is to use zip files,
-      but only two members, the ``metadata.yml`` and a ``data.zip``. The ``data.zip`` would
-      contain all of the actual package files, and would itself not use compression, but when
-      added to the package zip, it would. That then allows compression to cross member boundaries
-      and can reduce file size. However doing that makes it harder to both construct these
-      packages, and to use them manually.
-
 The packaging format will be a simple ZIP archive, where members must be compressed using the
 standard deflate algorithm.
+
+The filename of the archive must be ``{name}-{version}.mq.zip``.
 
 The file layout is very simple, the zip archive must match the layout of the MQ folder for
 whatever files that the zip archive contains. For example:
@@ -116,9 +98,6 @@ files:
 
 ### name
 
-TODO: Does RedGuides Resource Manager enforce unique names? If not do we need to put
-      in protections against that, or can we rely on moderation?
-
 The name of the package, this could be something like ``MQ2Forage``, ``KissAssist``, etc.
 
 This is considered to be case insensitive, can only contain alphanumeric letters, and
@@ -151,7 +130,8 @@ the following operations:
 - ``*`` - Wildcard, this is basically the same as ``=`` with less than 3 digits,
           so ``I.J.*`` is the same as ``=I.J``.
 
-For more details, you can check out the Rust [Version Op page](https://docs.rs/semver/latest/semver/enum.Op.html).
+For more details, you can check out the Rust
+[Version Op page](https://docs.rs/semver/latest/semver/enum.Op.html).
 
 ### config_files (Optional)
 
@@ -165,7 +145,7 @@ This is optional, if it doesn't exist then the packaging system will not be awar
 of any config files that might belong to this package, so a "purge" (uninstall
 with config removal) will leave those files behind.
 
-## files (Optional)
+### files (Optional)
 
 A list of all files (relative to the MacroQuest directory) that belong to this
 package. This is optional because for ease of use, it does not need to be specified
@@ -431,3 +411,27 @@ strategies that can be used to implement them:
 The intent is that the package manifest should only be hosted over a valid HTTPS
 connection, and installers should verify that. Package files do not have to be (but
 can be) hosted over HTTPS, as the digest in the manifest will protect them regardless.
+
+
+## Changes
+
+- Require a ``.mq.zip`` extension. This will easily allow people to still use manual
+  unpackaging of the package, while enabling us to more easily differentiate from any
+  random zip file.
+
+- Assume that some external system (in our case, RedGuides Resource Manager / Moderators)
+  will ensure that only the correct people can publish packages for a particular package,
+  the system itself will just assume the repository is correct.
+
+- We're not going to use lzma or bzip2, since we're targeting making these easily able to
+  be manually unpacked, and a lot of common tooling people are likely to be using to handle
+  zip files likely won't be able to handle either.
+
+- We're not going to do any zip inside zip tricks to get better compression. While these can
+  produce smaller packages, they make it harder to unzip these manually, and we're trying
+  to keep these something that can be easily manually installed. In addition, most of these
+  packages aren't going to be very large to begin with, so the space savings is likely going
+  to be pretty small.
+
+- Unless someone comes up with something better, these packages are just going to be called
+  MQ Packages.
