@@ -44,11 +44,6 @@ these problems.
 
 ## Format
 
-TODO: Should we use a different extension besides .zip? A different extension would make
-      it easier to differentiate, between package files and random zip files. However
-      the .zip extension makes it easier for people to still manually install these. We
-      could split the different and do something like .mq.zip as the extension.
-
 TODO: Is there any reason to use either bzip2 or lzma compression? I think that only some
       tools support that, so it possibly makes it harder to manually install these package
       files, but it could also produce smaller packages. Would have to test it.
@@ -66,6 +61,8 @@ TODO: zip files compress members individually, a common packaging trick is to us
 
 The packaging format will be a simple ZIP archive, where members must be compressed using the
 standard deflate algorithm.
+
+The filename of the archive must be ``{name}-{version}.mq.zip``.
 
 The file layout is very simple, the zip archive must match the layout of the MQ folder for
 whatever files that the zip archive contains. For example:
@@ -431,3 +428,10 @@ strategies that can be used to implement them:
 The intent is that the package manifest should only be hosted over a valid HTTPS
 connection, and installers should verify that. Package files do not have to be (but
 can be) hosted over HTTPS, as the digest in the manifest will protect them regardless.
+
+
+## Changes
+
+- Require a ``.mq.zip`` extension. This will easily allow people to still use manual
+  unpackaging of the package, while enabling us to more easily differentiate from any
+  random zip file.
