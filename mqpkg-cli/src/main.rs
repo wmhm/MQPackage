@@ -2,16 +2,20 @@
 // 2.0, and the BSD License. See the LICENSE file in the root of this repository
 // for complete details.
 
-use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 
-use mqpkg::Config;
+use anyhow::{Context, Result};
+use camino::Utf8PathBuf;
+use clap::{Parser, Subcommand};
+use vfs::{PhysicalFS, VfsPath};
+
+use mqpkg::config::{find_config_dir, Config, CONFIG_FILENAME};
 
 #[derive(Parser, Debug)]
 #[clap(version)]
 struct Cli {
     #[clap(global = true, short, long)]
-    target: Option<String>,
+    target: Option<Utf8PathBuf>,
 
     #[clap(subcommand)]
     command: Commands,
@@ -26,15 +30,20 @@ enum Commands {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let _config = match cli.target {
-        Some(target) => Config::load(&target)
-            .with_context(|| format!("Invalid target directory '{}'", target))?,
-        None => {
-            let cur = std::env::current_dir()?;
-            Config::find(&cur)
-                .with_context(|| format!("Unable to find target dir from '{}'", cur.display()))?
-        }
+    let root = match cli.target {
+        Some(target) => target,
+        None => find_config_dir(Utf8PathBuf::try_from(std::env::current_dir()?)?).with_context(
+            || {
+                format!(
+                    "Unable to find '{}' in current directory or parents",
+                    CONFIG_FILENAME
+                )
+            },
+        )?,
     };
+    let fs: VfsPath = PhysicalFS::new(PathBuf::from(root)).into();
+    let _config =
+        Config::load(&fs).with_context(|| format!("Invalid target directory '{}'", fs.as_str()))?;
 
     match &cli.command {
         Commands::Install {} => Ok(()),

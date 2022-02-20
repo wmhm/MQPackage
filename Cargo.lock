@@ -32,6 +32,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
+name = "camino"
+version = "1.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f3132262930b0522068049f5870a856ab8affc80c70d08b6ecb785771a6fc23"
+
+[[package]]
 name = "clap"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -95,12 +101,6 @@ dependencies = [
  "quote",
  "syn",
 ]
-
-[[package]]
-name = "dunce"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "453440c271cf5577fd2a40e4942540cb7d0d2f85e27c8d07dd0023c925a67541"
 
 [[package]]
 name = "fnv"
@@ -200,12 +200,13 @@ checksum = "308cc39be01b73d0d18f82a0e7b2a3df85245f84af96fdddc5d202d27e47b86a"
 name = "mqpkg"
 version = "0.1.0"
 dependencies = [
- "dunce",
+ "camino",
  "serde",
  "serde_with",
  "serde_yaml",
  "thiserror",
  "url",
+ "vfs",
 ]
 
 [[package]]
@@ -213,8 +214,10 @@ name = "mqpkg-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "camino",
  "clap",
  "mqpkg",
+ "vfs",
 ]
 
 [[package]]
@@ -447,6 +450,15 @@ name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
+
+[[package]]
+name = "vfs"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67fe15bc81afdceeaedd710d237f9043e895fd619db42cb503d9bfbb27a9f3a1"
+dependencies = [
+ "thiserror",
+]
 
 [[package]]
 name = "winapi"

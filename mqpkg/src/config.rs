@@ -2,17 +2,34 @@
 // 2.0, and the BSD License. See the LICENSE file in the root of this repository
 // for complete details.
 
-use std::fs::File;
-use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use camino::Utf8PathBuf;
 use serde::Deserialize;
 use serde_with::{serde_as, DisplayFromStr, PickFirst};
+use thiserror::Error;
 use url::Url;
+use vfs::VfsPath;
 
-use super::Error;
+pub const CONFIG_FILENAME: &str = "mqpkg.yml";
 
-const CONFIG_FILENAME: &str = "mqpkg.yml";
+#[derive(Error, Debug)]
+pub enum ConfigError {
+    #[error("no configuration file")]
+    NoConfig { source: vfs::VfsError },
+
+    #[error("invalid configuration")]
+    InvalidConfig { source: serde_yaml::Error },
+
+    #[error("invalid url")]
+    InvalidURL { source: url::ParseError },
+
+    #[error("unable to traverse directory")]
+    DirectoryTraversalError { source: vfs::VfsError },
+
+    #[error("unable to locate a valid directory")]
+    NoTargetDirectoryFound,
+}
 
 #[derive(Deserialize, Debug)]
 struct Repository {
@@ -21,10 +38,10 @@ struct Repository {
 }
 
 impl FromStr for Repository {
-    type Err = Error;
+    type Err = ConfigError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let url = Url::from_str(s).map_err(|source| Error::InvalidURL { source })?;
+        let url = Url::from_str(s).map_err(|source| ConfigError::InvalidURL { source })?;
 
         Ok(Repository { _url: url })
     }
@@ -33,52 +50,41 @@ impl FromStr for Repository {
 #[serde_with::serde_as]
 #[derive(Deserialize, Debug)]
 pub struct Config {
-    #[serde(skip)]
-    target: PathBuf,
-
     #[serde(rename = "repositories")]
     #[serde_as(as = "Vec<PickFirst<(_, DisplayFromStr)>>")]
     _repositories: Vec<Repository>,
 }
 
 impl Config {
-    pub fn target(&self) -> &Path {
-        self.target.as_path()
+    pub fn load(root: &VfsPath) -> Result<Config, ConfigError> {
+        let file = root
+            .join(CONFIG_FILENAME)
+            .map_err(|source| ConfigError::NoConfig { source })?
+            .open_file()
+            .map_err(|source| ConfigError::NoConfig { source })?;
+        let config: Config = serde_yaml::from_reader(file)
+            .map_err(|source| ConfigError::InvalidConfig { source })?;
+
+        Ok(config)
     }
 }
 
-impl Config {
-    pub fn load<P>(path: P) -> Result<Config, Error>
-    where
-        P: AsRef<Path>,
-    {
-        let target = dunce::canonicalize(path)?;
-        let configfile = File::open(target.join(CONFIG_FILENAME))
-            .map_err(|source| Error::NoConfig { source })?;
-        let config: Config = serde_yaml::from_reader(configfile)?;
+pub fn find_config_dir<P>(path: P) -> Result<Utf8PathBuf, ConfigError>
+where
+    P: Into<Utf8PathBuf>,
+{
+    let mut path = path.into();
+    loop {
+        path.push(CONFIG_FILENAME);
+        if path.is_file() {
+            assert!(path.pop());
+            break Ok(path);
+        }
 
-        Ok(Config { target, ..config })
-    }
-
-    pub fn find<P>(path: P) -> Result<Config, Error>
-    where
-        P: Into<PathBuf>,
-    {
-        let mut path = path.into();
-        let target = loop {
-            path.push(CONFIG_FILENAME);
-            if path.is_file() {
-                assert!(path.pop());
-                break path;
-            }
-
-            // Remove the filename, and the parent, and
-            // if that's not successful, it's an error.
-            if !(path.pop() && path.pop()) {
-                return Err(Error::NoTargetDirectoryFound);
-            }
-        };
-
-        Config::load(target)
+        // Remove the filename, and the parent, and
+        // if that's not successful, it's an error.
+        if !(path.pop() && path.pop()) {
+            return Err(ConfigError::NoTargetDirectoryFound);
+        }
     }
 }
