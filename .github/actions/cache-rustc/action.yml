@@ -15,7 +15,7 @@ runs:
     - name: Save sccache
       uses: actions/cache@v2
       with:
-        path: ${{ matrix.sccache-path }}
+        path: ~/.sccache
         key: ${{ runner.os }}-sccache-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           ${{ runner.os }}-sccache-
