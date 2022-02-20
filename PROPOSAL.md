@@ -155,11 +155,11 @@ however it is *not* optional when installed into the ``pkgdb`` directory.
 This does not support the glob syntax, all files must be declared explicitly.
 
 
-## repositories.yml
+## mqpkg.yml
 
-This file is used to tell the installer what repositories a particular target
-directory wants to pull packages from. It must exist at the root of the target
-directory, and it is a simple yaml file that looks like:
+This file is used to configure the installer so that it is able to use the
+correct settings for a particular target directory. It must exist at the root
+of the target directory. It is a yaml file with a schema like:
 
 ```yaml
 repositories:
@@ -311,7 +311,7 @@ generate that.
 ### What does workflow look like for an end user?
 
 The end user will need to create the target directory, which will need to contain a
-``repositories.yml``file at the *root* of the target directory. The installer can then
+``mqpkg.yml``file at the *root* of the target directory. The installer can then
 be invoked on the command line using something like (cli name tbd):
 
 ```
@@ -364,7 +364,7 @@ an empty package that just contains dependencies on everything that is "shipped"
 with VV itself.
 
 A single .zip file containing everything could still be produced, it would just
-contain the ``repositories.yml`` file and ``pkgdb`` directory in addition to what
+contain the ``mqpkg.yml`` file and ``pkgdb`` directory in addition to what
 it already ships.
 
 Since under the covers, VV becomes just a meta package, that means all of the
@@ -386,7 +386,7 @@ there's two strategies that could be employed:
    same files.
 2. You could make another repository that contains all of the non compile specific
    packages, and have the common pattern to have like a ``live.json`` and ``all.json``
-   repositories that are bot hadded to the ``repositories.yml``.
+   repositories that are both added to the ``mqpkg.yml``.
 
 
 ### How are Paywalled packages handled?
@@ -402,7 +402,7 @@ strategies that can be used to implement them:
 
 2. Generate a repository for each paywalled package, and make it also paywalled
    (or not, you could still leave it open). Then when a user wants to add paywalled
-   content, they have to first add a new line to their ``repositories.yml``, then
+   content, they have to first add a new line to their ``mqpkg.yml``, then
    after that everything functions as expected.
 
 
