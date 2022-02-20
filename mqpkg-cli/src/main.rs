@@ -32,15 +32,14 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let root = match cli.target {
         Some(target) => target,
-        None => {
-            let cur = Utf8PathBuf::try_from(std::env::current_dir()?)?;
-            find_config_dir(cur).with_context(|| {
+        None => find_config_dir(Utf8PathBuf::try_from(std::env::current_dir()?)?).with_context(
+            || {
                 format!(
                     "Unable to find '{}' in current directory or parents",
                     CONFIG_FILENAME
                 )
-            })?
-        }
+            },
+        )?,
     };
     let fs: VfsPath = PhysicalFS::new(PathBuf::from(root)).into();
     let _config =
