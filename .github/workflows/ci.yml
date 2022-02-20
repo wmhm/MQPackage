@@ -27,67 +27,52 @@ jobs:
           command: fmt
           args: --all -- --check
 
+
   lint:
     name: Lint
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: ./.github/actions/cache-rustc
-        with:
-          type: lint
-      - uses: ./.github/actions/cache-cargo
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           components: clippy
           override: true
+      - uses: Swatinem/rust-cache@v1
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
           args: -- -D warnings
-      - name: Print sccache stats
-        shell: pwsh
-        run: sccache --show-stats
+
 
   check:
     name: Check
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: ./.github/actions/cache-rustc
-        with:
-          type: check
-      - uses: ./.github/actions/cache-cargo
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
+      - uses: Swatinem/rust-cache@v1
       - uses: actions-rs/cargo@v1
         with:
           command: check
-      - name: Print sccache stats
-        shell: pwsh
-        run: sccache --show-stats
+
 
   test:
     name: Test
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: ./.github/actions/cache-rustc
-        with:
-          type: test
-      - uses: ./.github/actions/cache-cargo
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
+      - uses: Swatinem/rust-cache@v1
       - uses: actions-rs/cargo@v1
         with:
           command: test
-      - name: Print sccache stats
-        shell: pwsh
-        run: sccache --show-stats
