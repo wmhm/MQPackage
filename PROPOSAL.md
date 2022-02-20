@@ -155,11 +155,17 @@ however it is *not* optional when installed into the ``pkgdb`` directory.
 This does not support the glob syntax, all files must be declared explicitly.
 
 
-## repositories.yml
+## MQPackage.yml
 
-This file is used to tell the installer what repositories a particular target
-directory wants to pull packages from. It must exist at the root of the target
-directory, and it is a simple yaml file that looks like:
+TODO: Is ``MQPackage.yml`` at the root the best filename here? I originally had
+      ``repositories.yml`` but it created odd sounding names when you talked
+      about the ``repositories`` key within it. I also thought about
+      ``config.yml`` or something similiar to that as well, but I was worried
+      that it would be confusing to people when that was specific to MQPackage.
+
+This file is used to configure the installer so that it is able to use the
+correct settings for a particular target directory. It must exist at the root
+of the target directory. It is a yaml file with a schema like:
 
 ```yaml
 repositories:

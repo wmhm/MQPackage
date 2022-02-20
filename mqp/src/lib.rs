@@ -9,18 +9,18 @@ use serde::Deserialize;
 use thiserror::Error;
 use url::Url;
 
-const REPOSITORY_FILENAME: &str = "repositories.yml";
+const CONFIG_FILENAME: &str = "MQPackage.yml";
 
 #[derive(Error, Debug)]
 pub enum MQPackageError {
-    #[error("no repository configuration file")]
-    NoRepositoryConfig {
+    #[error("no configuration file")]
+    NoConfig {
         #[from]
         source: std::io::Error,
     },
 
-    #[error("invalid repository configuration")]
-    InvalidRepositoryConfig {
+    #[error("invalid configuration")]
+    InvalidConfig {
         #[from]
         source: serde_yaml::Error,
     },
@@ -56,8 +56,8 @@ impl Config {
         P: Into<PathBuf>,
     {
         let path = path.into();
-        let repofile = File::open(path.join(REPOSITORY_FILENAME))
-            .map_err(|source| MQPackageError::NoRepositoryConfig { source })?;
+        let repofile = File::open(path.join(CONFIG_FILENAME))
+            .map_err(|source| MQPackageError::NoConfig { source })?;
         let repos: Repository = serde_yaml::from_reader(repofile)?;
 
         Ok(Config {
@@ -72,7 +72,7 @@ impl Config {
     {
         let mut path = path.into();
         let target = loop {
-            path.push(REPOSITORY_FILENAME);
+            path.push(CONFIG_FILENAME);
             if path.is_file() {
                 assert!(path.pop());
                 break path;
