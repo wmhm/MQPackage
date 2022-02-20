@@ -30,4 +30,4 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           bloat_args: --release --locked
-          tree_args: --release --locked
+          tree_args: --locked
