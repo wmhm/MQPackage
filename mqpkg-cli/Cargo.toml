@@ -10,5 +10,6 @@ path = "src/main.rs"
 [dependencies]
 mqpkg = { path = "../mqpkg" }
 anyhow = "1.0"
+camino = "1.0.7"
 clap = { version = "3.1.0", features = ["derive"] }
 vfs = "0.5.2"

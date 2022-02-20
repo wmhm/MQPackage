@@ -5,6 +5,7 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
+use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
 use vfs::{PhysicalFS, VfsPath};
 
@@ -14,7 +15,7 @@ use mqpkg::config::{find_config_dir, Config, CONFIG_FILENAME};
 #[clap(version)]
 struct Cli {
     #[clap(global = true, short, long)]
-    target: Option<String>,
+    target: Option<Utf8PathBuf>,
 
     #[clap(subcommand)]
     command: Commands,
@@ -29,20 +30,21 @@ enum Commands {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let root: VfsPath = match cli.target {
-        Some(target) => PhysicalFS::new(PathBuf::from(target)).into(),
+    let root = match cli.target {
+        Some(target) => target,
         None => {
-            let configdir = find_config_dir(std::env::current_dir()?).with_context(|| {
+            let cur = Utf8PathBuf::try_from(std::env::current_dir()?)?;
+            find_config_dir(cur).with_context(|| {
                 format!(
                     "Unable to find '{}' in current directory or parents",
                     CONFIG_FILENAME
                 )
-            })?;
-            PhysicalFS::new(configdir).into()
+            })?
         }
     };
-    let _config = Config::load(&root)
-        .with_context(|| format!("Invalid target directory '{}'", root.as_str()))?;
+    let fs: VfsPath = PhysicalFS::new(PathBuf::from(root)).into();
+    let _config =
+        Config::load(&fs).with_context(|| format!("Invalid target directory '{}'", fs.as_str()))?;
 
     match &cli.command {
         Commands::Install {} => Ok(()),

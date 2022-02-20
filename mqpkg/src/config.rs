@@ -2,9 +2,9 @@
 // 2.0, and the BSD License. See the LICENSE file in the root of this repository
 // for complete details.
 
-use std::path::PathBuf;
 use std::str::FromStr;
 
+use camino::Utf8PathBuf;
 use serde::Deserialize;
 use serde_with::{serde_as, DisplayFromStr, PickFirst};
 use thiserror::Error;
@@ -69,9 +69,9 @@ impl Config {
     }
 }
 
-pub fn find_config_dir<P>(path: P) -> Result<PathBuf, ConfigError>
+pub fn find_config_dir<P>(path: P) -> Result<Utf8PathBuf, ConfigError>
 where
-    P: Into<PathBuf>,
+    P: Into<Utf8PathBuf>,
 {
     let mut path = path.into();
     loop {
