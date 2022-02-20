@@ -315,7 +315,7 @@ The end user will need to create the target directory, which will need to contai
 be invoked on the command line using something like (cli name tbd):
 
 ```
-$ mq-package install --target C:\MacroQuest\ kissassist MQ2Shaman lootly
+$ mqpkg install --target C:\MacroQuest\ kissassist MQ2Shaman lootly
 ```
 
 The installer itself will be designed to also be programatially invoked, so that
