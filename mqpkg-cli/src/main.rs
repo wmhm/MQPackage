@@ -5,7 +5,7 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 
-use mqp::Config;
+use mqpkg::Config;
 
 #[derive(Parser, Debug)]
 #[clap(version)]
@@ -31,7 +31,7 @@ fn main() -> Result<()> {
             .with_context(|| format!("Invalid target directory '{}'", target))?,
         None => {
             let cur = std::env::current_dir()?;
-            mqp::Config::find(&cur)
+            Config::find(&cur)
                 .with_context(|| format!("Unable to find target dir from '{}'", cur.display()))?
         }
     };
