@@ -145,7 +145,7 @@ This is optional, if it doesn't exist then the packaging system will not be awar
 of any config files that might belong to this package, so a "purge" (uninstall
 with config removal) will leave those files behind.
 
-## files (Optional)
+### files (Optional)
 
 A list of all files (relative to the MacroQuest directory) that belong to this
 package. This is optional because for ease of use, it does not need to be specified
