@@ -11,3 +11,4 @@ path = "src/main.rs"
 mqpkg = { path = "../mqpkg" }
 anyhow = "1.0"
 clap = { version = "3.1.0", features = ["derive"] }
+vfs = "0.5.2"

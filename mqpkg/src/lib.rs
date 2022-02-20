@@ -4,29 +4,23 @@
 
 use thiserror::Error as BaseError;
 
-pub use self::config::Config;
+pub use self::config::{find_config_dir, Config, CONFIG_FILENAME};
 
 mod config;
 
 #[derive(BaseError, Debug)]
 pub enum Error {
     #[error("no configuration file")]
-    NoConfig {
-        #[from]
-        source: std::io::Error,
-    },
+    NoConfig { source: vfs::VfsError },
 
     #[error("invalid configuration")]
-    InvalidConfig {
-        #[from]
-        source: serde_yaml::Error,
-    },
+    InvalidConfig { source: serde_yaml::Error },
 
     #[error("invalid url")]
-    InvalidURL {
-        #[from]
-        source: url::ParseError,
-    },
+    InvalidURL { source: url::ParseError },
+
+    #[error("unable to traverse directory")]
+    DirectoryTraversalError { source: vfs::VfsError },
 
     #[error("unable to locate a valid directory")]
     NoTargetDirectoryFound,

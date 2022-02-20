@@ -2,10 +2,13 @@
 // 2.0, and the BSD License. See the LICENSE file in the root of this repository
 // for complete details.
 
+use std::path::PathBuf;
+
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use vfs::{PhysicalFS, VfsPath};
 
-use mqpkg::Config;
+use mqpkg::{find_config_dir, Config, CONFIG_FILENAME};
 
 #[derive(Parser, Debug)]
 #[clap(version)]
@@ -27,12 +30,18 @@ enum Commands {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let _config = match cli.target {
-        Some(target) => Config::load(&target)
-            .with_context(|| format!("Invalid target directory '{}'", target))?,
+        Some(target) => {
+            let root: VfsPath = PhysicalFS::new(PathBuf::from(&target)).into();
+            Config::load(root).with_context(|| format!("Invalid target directory '{}'", target))?
+        }
         None => {
-            let cur = std::env::current_dir()?;
-            Config::find(&cur)
-                .with_context(|| format!("Unable to find target dir from '{}'", cur.display()))?
+            let root: VfsPath = PhysicalFS::new(find_config_dir(std::env::current_dir()?)?).into();
+            Config::load(root).with_context(|| {
+                format!(
+                    "Unable to find '{}' in current directory or parents",
+                    CONFIG_FILENAME
+                )
+            })?
         }
     };
 

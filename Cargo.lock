@@ -206,6 +206,7 @@ dependencies = [
  "serde_yaml",
  "thiserror",
  "url",
+ "vfs",
 ]
 
 [[package]]
@@ -215,6 +216,7 @@ dependencies = [
  "anyhow",
  "clap",
  "mqpkg",
+ "vfs",
 ]
 
 [[package]]
@@ -447,6 +449,15 @@ name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
+
+[[package]]
+name = "vfs"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67fe15bc81afdceeaedd710d237f9043e895fd619db42cb503d9bfbb27a9f3a1"
+dependencies = [
+ "thiserror",
+]
 
 [[package]]
 name = "winapi"
