@@ -1,5 +1,10 @@
 name: Cache rustc
 description: Caches rustc output with sccache
+inputs:
+  type:
+    description: "An extra piece of the cache key, to allow different jobs to use different caches."
+    required: false
+    default: "build"
 runs:
   using: "composite"
   steps:
@@ -14,9 +19,11 @@ runs:
       uses: actions/cache@v2
       with:
         path: C:\Users\runneradmin\.sccache
-        key: ${{ runner.os }}-sccache-v2-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-sccache-${{ inputs.type }}-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
-          ${{ runner.os }}-sccache-v2-
+          ${{ runner.os }}-sccache-${{ inputs.type }}-${{ hashFiles('**/Cargo.lock') }}
+          ${{ runner.os }}-sccache-${{ inputs.type }}-
+          ${{ runner.os }}-sccache-
     - name: Start sccache server
       shell: pwsh
       run: sccache --start-server
