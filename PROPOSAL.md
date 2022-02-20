@@ -44,10 +44,6 @@ these problems.
 
 ## Format
 
-TODO: If we decide to use an extension, we should come up with a name for these package files
-      and we might want to do that regardless. For instance the pkgdb directory could be named
-      after that instead.
-
 TODO: zip files compress members individually, a common packaging trick is to use zip files,
       but only two members, the ``metadata.yml`` and a ``data.zip``. The ``data.zip`` would
       contain all of the actual package files, and would itself not use compression, but when
@@ -436,3 +432,6 @@ can be) hosted over HTTPS, as the digest in the manifest will protect them regar
 - We're not going to use lzma or bzip2, since we're targeting making these easily able to
   be manually unpacked, and a lot of common tooling people are likely to be using to handle
   zip files likely won't be able to handle either.
+
+- Unless someone comes up with something better, these packages are just going to be called
+  MQ Packages.
