@@ -44,10 +44,6 @@ these problems.
 
 ## Format
 
-TODO: Is there any reason to use either bzip2 or lzma compression? I think that only some
-      tools support that, so it possibly makes it harder to manually install these package
-      files, but it could also produce smaller packages. Would have to test it.
-
 TODO: If we decide to use an extension, we should come up with a name for these package files
       and we might want to do that regardless. For instance the pkgdb directory could be named
       after that instead.
@@ -436,3 +432,7 @@ can be) hosted over HTTPS, as the digest in the manifest will protect them regar
 - Assume that some external system (in our case, RedGuides Resource Manager / Moderators)
   will ensure that only the correct people can publish packages for a particular package,
   the system itself will just assume the repository is correct.
+
+- We're not going to use lzma or bzip2, since we're targeting making these easily able to
+  be manually unpacked, and a lot of common tooling people are likely to be using to handle
+  zip files likely won't be able to handle either.
