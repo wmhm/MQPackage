@@ -16,9 +16,9 @@ runs:
       uses: actions/cache@v2
       with:
         path: ~/.sccache
-        key: ${{ runner.os }}-sccache-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-sccache-v2-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
-          ${{ runner.os }}-sccache-
+          ${{ runner.os }}-sccache-v2-
     - name: Start sccache server
       shell: pwsh
       run: sccache --start-server
