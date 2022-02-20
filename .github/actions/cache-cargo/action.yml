@@ -1,10 +1,5 @@
-name: Cache rust
-description: Caches rustc using sscache and cargo data
-inputs:
-  cargo:
-    description: Cache cargo
-    required: true
-    default: "true"
+name: Cache cargo
+description: Caches cargo
 runs:
   using: "composite"
   steps:
