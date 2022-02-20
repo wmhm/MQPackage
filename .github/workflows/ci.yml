@@ -33,6 +33,7 @@ jobs:
       - uses: ./.github/actions/scoop
       - name: Install sscache
         run: scoop install sccache
+      - uses: ./.github/actions/cache-rust
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
