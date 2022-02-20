@@ -30,7 +30,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: .github/actions/scoop
+      - uses: ./.github/actions/scoop
       - name: Install sscache
         run: scoop install sccache
       - uses: actions-rs/toolchain@v1
