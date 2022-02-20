@@ -113,9 +113,6 @@ files:
 
 ### name
 
-TODO: Does RedGuides Resource Manager enforce unique names? If not do we need to put
-      in protections against that, or can we rely on moderation?
-
 The name of the package, this could be something like ``MQ2Forage``, ``KissAssist``, etc.
 
 This is considered to be case insensitive, can only contain alphanumeric letters, and
@@ -435,3 +432,7 @@ can be) hosted over HTTPS, as the digest in the manifest will protect them regar
 - Require a ``.mq.zip`` extension. This will easily allow people to still use manual
   unpackaging of the package, while enabling us to more easily differentiate from any
   random zip file.
+
+- Assume that some external system (in our case, RedGuides Resource Manager / Moderators)
+  will ensure that only the correct people can publish packages for a particular package,
+  the system itself will just assume the repository is correct.
