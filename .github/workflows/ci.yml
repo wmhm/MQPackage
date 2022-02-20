@@ -26,6 +26,9 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: check
+      - name: Print sccache stats
+        shell: pwsh
+        run: sccache --show-stats
 
   test:
     name: Test Suite
@@ -79,3 +82,6 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings
+      - name: Print sccache stats
+        shell: pwsh
+        run: sccache --show-stats
