@@ -10,7 +10,6 @@ runs:
   steps:
     - name: Cache cargo
       uses: actions/cache@v2
-      continue-on-error: false
       with:
         path: |
           ~/.cargo/registry
