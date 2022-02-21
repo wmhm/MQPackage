@@ -12,32 +12,8 @@ use thiserror::Error;
 use vfs::VfsPath;
 
 pub mod config;
-pub mod operations;
 
 mod pkgdb;
-
-#[derive(Error, Debug)]
-pub enum EnvironmentError {
-    #[error(transparent)]
-    PkgDBError(#[from] pkgdb::PkgDBError),
-}
-
-pub struct Environment {
-    pkgdb: pkgdb::PkgDB,
-}
-
-impl Environment {
-    pub fn new(_config: config::Config, fs: VfsPath) -> Result<Environment, EnvironmentError> {
-        let pkgdb = pkgdb::PkgDB::new(fs.clone())?;
-
-        Ok(Environment { pkgdb })
-    }
-
-    fn request(&mut self, package: &PackageName) -> Result<(), EnvironmentError> {
-        self.pkgdb.request_package(package)?;
-        Ok(())
-    }
-}
 
 #[derive(Error, Debug)]
 pub enum PackageNameError {
@@ -79,5 +55,36 @@ impl FromStr for PackageName {
         }
 
         Ok(PackageName(value.to_ascii_lowercase()))
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum MQPkgError {
+    #[error(transparent)]
+    PkgDBError(#[from] pkgdb::PkgDBError),
+}
+
+pub struct MQPkg {
+    pkgdb: pkgdb::PkgDB,
+}
+
+impl MQPkg {
+    pub fn new(_config: config::Config, fs: VfsPath) -> Result<MQPkg, MQPkgError> {
+        let pkgdb = pkgdb::PkgDB::new(fs.clone())?;
+
+        Ok(MQPkg { pkgdb })
+    }
+
+    fn add(&mut self, package: &PackageName) -> Result<(), MQPkgError> {
+        self.pkgdb.add(package)?;
+        Ok(())
+    }
+
+    pub fn install(&mut self, packages: &[PackageName]) -> Result<(), MQPkgError> {
+        for package in packages {
+            self.add(package)?
+        }
+
+        Ok(())
     }
 }

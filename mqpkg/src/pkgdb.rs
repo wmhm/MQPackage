@@ -47,7 +47,7 @@ impl PkgDB {
         Ok(PkgDB { fs, state })
     }
 
-    pub fn request_package(&mut self, package: &PackageName) -> PkgDBResult<()> {
+    pub fn add(&mut self, package: &PackageName) -> PkgDBResult<()> {
         let request = match self.state.requested.remove(package) {
             Some(r) => r,
             None => PackageRequest {

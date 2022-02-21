@@ -10,8 +10,7 @@ use clap::{Parser, Subcommand};
 use vfs::{PhysicalFS, VfsPath};
 
 use mqpkg::config::{find_config_dir, Config, CONFIG_FILENAME};
-use mqpkg::operations;
-use mqpkg::{Environment, PackageName};
+use mqpkg::{MQPkg, PackageName};
 
 #[derive(Parser, Debug)]
 #[clap(version)]
@@ -47,11 +46,11 @@ fn main() -> Result<()> {
     let fs: VfsPath = PhysicalFS::new(PathBuf::from(&root)).into();
     let config =
         Config::load(&fs).with_context(|| format!("invalid target directory '{}'", root))?;
-    let mut env = Environment::new(config, fs)
+    let mut pkg = MQPkg::new(config, fs)
         .with_context(|| format!("could not initialize environment in '{}'", root))?;
 
     match &cli.command {
-        Commands::Install { packages } => Ok(operations::install(&mut env, packages)?),
+        Commands::Install { packages } => Ok(pkg.install(packages)?),
         _ => Err(anyhow!("command not implemented")),
     }
 }
