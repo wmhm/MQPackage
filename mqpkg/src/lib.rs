@@ -61,22 +61,22 @@ impl FromStr for PackageName {
 #[derive(Error, Debug)]
 pub enum MQPkgError {
     #[error(transparent)]
-    PkgDBError(#[from] pkgdb::PkgDBError),
+    DBError(#[from] pkgdb::DBError),
 }
 
 pub struct MQPkg {
-    pkgdb: pkgdb::PkgDB,
+    db: pkgdb::Database,
 }
 
 impl MQPkg {
     pub fn new(_config: config::Config, fs: VfsPath) -> Result<MQPkg, MQPkgError> {
-        let pkgdb = pkgdb::PkgDB::new(fs.clone())?;
+        let db = pkgdb::Database::new(fs.clone())?;
 
-        Ok(MQPkg { pkgdb })
+        Ok(MQPkg { db })
     }
 
     fn add(&mut self, package: &PackageName) -> Result<(), MQPkgError> {
-        self.pkgdb.add(package)?;
+        self.db.add(package)?;
         Ok(())
     }
 
