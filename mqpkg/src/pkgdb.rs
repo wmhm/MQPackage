@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use vfs::VfsPath;
 
+use super::PackageName;
+
 const PKGDB_DIR: &str = "pkgdb";
 const STATE_FILE: &str = "state.yml";
 
@@ -23,13 +25,13 @@ pub enum PkgDBError {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct PackageRequest {
-    name: String,
+    name: PackageName,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(default)]
 struct State {
-    requested: HashMap<String, PackageRequest>,
+    requested: HashMap<PackageName, PackageRequest>,
 }
 
 type PkgDBResult<T> = Result<T, PkgDBError>;
@@ -45,14 +47,14 @@ impl PkgDB {
         Ok(PkgDB { fs, state })
     }
 
-    pub fn request_package(&mut self, package: &str) -> PkgDBResult<()> {
+    pub fn request_package(&mut self, package: &PackageName) -> PkgDBResult<()> {
         let request = match self.state.requested.remove(package) {
             Some(r) => r,
             None => PackageRequest {
-                name: String::from(package),
+                name: package.clone(),
             },
         };
-        self.state.requested.insert(String::from(package), request);
+        self.state.requested.insert(package.clone(), request);
         self.save_state()?;
         Ok(())
     }

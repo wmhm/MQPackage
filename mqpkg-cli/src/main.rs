@@ -11,7 +11,7 @@ use vfs::{PhysicalFS, VfsPath};
 
 use mqpkg::config::{find_config_dir, Config, CONFIG_FILENAME};
 use mqpkg::operations;
-use mqpkg::Environment;
+use mqpkg::{Environment, PackageName};
 
 #[derive(Parser, Debug)]
 #[clap(version)]
@@ -27,7 +27,7 @@ struct Cli {
 enum Commands {
     Install {
         #[clap(required = true)]
-        packages: Vec<String>,
+        packages: Vec<PackageName>,
     },
     Uninstall {},
     Upgrade {},

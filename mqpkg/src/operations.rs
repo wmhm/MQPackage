@@ -4,7 +4,7 @@
 
 use thiserror::Error;
 
-use super::{Environment, EnvironmentError};
+use super::{Environment, EnvironmentError, PackageName};
 
 #[derive(Error, Debug)]
 pub enum InstallError {
@@ -12,7 +12,7 @@ pub enum InstallError {
     CannotAddPackage { source: EnvironmentError },
 }
 
-pub fn install(env: &mut Environment, packages: &[String]) -> Result<(), InstallError> {
+pub fn install(env: &mut Environment, packages: &[PackageName]) -> Result<(), InstallError> {
     for package in packages {
         env.request(package)
             .map_err(|source| InstallError::CannotAddPackage { source })?;
