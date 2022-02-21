@@ -7,6 +7,7 @@ use std::cmp::{Eq, PartialEq};
 use std::hash::Hash;
 use std::str::FromStr;
 
+use semver::VersionReq;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use vfs::VfsPath;
@@ -61,6 +62,40 @@ impl FromStr for PackageName {
 }
 
 #[derive(Error, Debug)]
+pub enum PackageSpecifierError {
+    #[error("specifier must have a package name")]
+    NoPackageName,
+
+    #[error(transparent)]
+    InvalidPackageName(#[from] PackageNameError),
+
+    #[error(transparent)]
+    InvalidVersionRequirement(#[from] semver::Error),
+}
+
+#[derive(Serialize, Deserialize, Clone, Eq, Debug, Hash, PartialEq)]
+pub struct PackageSpecifier {
+    name: PackageName,
+    version: VersionReq,
+}
+
+impl FromStr for PackageSpecifier {
+    type Err = PackageSpecifierError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let (name_s, version_s) = match value.find(|c: char| !c.is_ascii_alphanumeric()) {
+            Some(idx) => value.split_at(idx),
+            None => (value, "*"),
+        };
+
+        let name: PackageName = name_s.parse()?;
+        let version: VersionReq = version_s.parse()?;
+
+        Ok(PackageSpecifier { name, version })
+    }
+}
+
+#[derive(Error, Debug)]
 pub enum MQPkgError {
     #[error(transparent)]
     DBError(#[from] pkgdb::DBError),
@@ -77,7 +112,7 @@ impl MQPkg {
         Ok(MQPkg { db })
     }
 
-    pub fn install(&mut self, packages: &[PackageName]) -> Result<(), MQPkgError> {
+    pub fn install(&mut self, packages: &[PackageSpecifier]) -> Result<(), MQPkgError> {
         for package in packages {
             self.db.add(package)?;
         }

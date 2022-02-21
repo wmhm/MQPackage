@@ -10,7 +10,7 @@ use clap::{Parser, Subcommand};
 use vfs::{PhysicalFS, VfsPath};
 
 use mqpkg::config::{find_config_dir, Config, CONFIG_FILENAME};
-use mqpkg::{MQPkg, PackageName};
+use mqpkg::{MQPkg, PackageSpecifier};
 
 #[derive(Parser, Debug)]
 #[clap(version)]
@@ -26,7 +26,7 @@ struct Cli {
 enum Commands {
     Install {
         #[clap(required = true)]
-        packages: Vec<PackageName>,
+        packages: Vec<PackageSpecifier>,
     },
     Uninstall {},
     Upgrade {},

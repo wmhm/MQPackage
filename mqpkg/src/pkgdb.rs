@@ -5,11 +5,12 @@
 use std::collections::HashMap;
 use std::default::Default;
 
+use semver::VersionReq;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use vfs::VfsPath;
 
-use super::PackageName;
+use super::{PackageName, PackageSpecifier};
 
 const PKGDB_DIR: &str = "pkgdb";
 const STATE_FILE: &str = "state.yml";
@@ -26,6 +27,7 @@ pub enum DBError {
 #[derive(Serialize, Deserialize, Debug)]
 struct PackageRequest {
     name: PackageName,
+    version: VersionReq,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug)]
@@ -47,14 +49,14 @@ impl Database {
         Ok(Database { fs, state })
     }
 
-    pub fn add(&mut self, package: &PackageName) -> DBResult<()> {
-        let request = match self.state.requested.remove(package) {
-            Some(r) => r,
-            None => PackageRequest {
-                name: package.clone(),
+    pub fn add(&mut self, package: &PackageSpecifier) -> DBResult<()> {
+        self.state.requested.insert(
+            package.name.clone(),
+            PackageRequest {
+                name: package.name.clone(),
+                version: package.version.clone(),
             },
-        };
-        self.state.requested.insert(package.clone(), request);
+        );
         self.save_state()?;
         Ok(())
     }
