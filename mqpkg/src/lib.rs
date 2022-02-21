@@ -72,7 +72,7 @@ pub struct MQPkg {
 
 impl MQPkg {
     pub fn new(_config: config::Config, fs: VfsPath) -> Result<MQPkg, MQPkgError> {
-        let db = pkgdb::Database::new(fs.clone())?;
+        let db = pkgdb::Database::new(fs)?;
 
         Ok(MQPkg { db })
     }
