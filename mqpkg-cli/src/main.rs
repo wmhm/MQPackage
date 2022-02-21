@@ -2,14 +2,16 @@
 // 2.0, and the BSD License. See the LICENSE file in the root of this repository
 // for complete details.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
 use vfs::{PhysicalFS, VfsPath};
 
 use mqpkg::config::{find_config_dir, Config, CONFIG_FILENAME};
+use mqpkg::operations;
+use mqpkg::Environment;
 
 #[derive(Parser, Debug)]
 #[clap(version)]
@@ -23,7 +25,10 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    Install {},
+    Install {
+        #[clap(required = true)]
+        packages: Vec<String>,
+    },
     Uninstall {},
     Upgrade {},
 }
@@ -31,23 +36,30 @@ enum Commands {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let root = match cli.target {
-        Some(target) => target,
-        None => find_config_dir(Utf8PathBuf::try_from(std::env::current_dir()?)?).with_context(
-            || {
-                format!(
-                    "Unable to find '{}' in current directory or parents",
-                    CONFIG_FILENAME
-                )
-            },
-        )?,
+        Some(target) => canonicalize(target)?,
+        None => find_config_dir(current_dir()?).with_context(|| {
+            format!(
+                "unable to find '{}' in current directory or parents",
+                CONFIG_FILENAME
+            )
+        })?,
     };
-    let fs: VfsPath = PhysicalFS::new(PathBuf::from(root)).into();
-    let _config =
-        Config::load(&fs).with_context(|| format!("Invalid target directory '{}'", fs.as_str()))?;
+    let fs: VfsPath = PhysicalFS::new(PathBuf::from(&root)).into();
+    let config =
+        Config::load(&fs).with_context(|| format!("invalid target directory '{}'", root))?;
+    let mut env = Environment::new(config, fs)
+        .with_context(|| format!("could not initialize environment in '{}'", root))?;
 
     match &cli.command {
-        Commands::Install {} => Ok(()),
-        Commands::Uninstall {} => Ok(()),
-        Commands::Upgrade {} => Ok(()),
+        Commands::Install { packages } => Ok(operations::install(&mut env, packages)?),
+        _ => Err(anyhow!("command not implemented")),
     }
+}
+
+fn canonicalize<P: AsRef<Path>>(path: P) -> Result<Utf8PathBuf> {
+    Ok(Utf8PathBuf::try_from(dunce::canonicalize(path)?)?)
+}
+
+fn current_dir() -> Result<Utf8PathBuf> {
+    canonicalize(std::env::current_dir()?)
 }
