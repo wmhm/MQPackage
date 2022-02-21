@@ -20,11 +20,11 @@ pub enum PackageNameError {
     #[error("names must have at least one character")]
     TooShort,
 
-    #[error("names must begin with an alpha character: {character:?}")]
-    NoStartingAlpha { character: String },
+    #[error("names must begin with an alpha character")]
+    NoStartingAlpha { name: String, character: String },
 
-    #[error("names must contain only alphanumeric characters: {character:?}")]
-    InvalidCharacter { character: String },
+    #[error("names must contain only alphanumeric characters")]
+    InvalidCharacter { name: String, character: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, Eq, Debug, Hash, PartialEq)]
@@ -39,6 +39,7 @@ impl FromStr for PackageName {
         if !value.starts_with(|c: char| c.is_ascii_alphabetic()) {
             return match value.chars().next() {
                 Some(c) => Err(PackageNameError::NoStartingAlpha {
+                    name: value.to_string(),
                     character: c.to_string(),
                 }),
                 None => Err(PackageNameError::TooShort),
@@ -49,6 +50,7 @@ impl FromStr for PackageName {
         for c in value.chars() {
             if !c.is_ascii_alphanumeric() {
                 return Err(PackageNameError::InvalidCharacter {
+                    name: value.to_string(),
                     character: c.to_string(),
                 });
             }
