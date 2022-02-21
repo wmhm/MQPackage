@@ -77,14 +77,9 @@ impl MQPkg {
         Ok(MQPkg { db })
     }
 
-    fn add(&mut self, package: &PackageName) -> Result<(), MQPkgError> {
-        self.db.add(package)?;
-        Ok(())
-    }
-
     pub fn install(&mut self, packages: &[PackageName]) -> Result<(), MQPkgError> {
         for package in packages {
-            self.add(package)?
+            self.db.add(package)?;
         }
 
         Ok(())
