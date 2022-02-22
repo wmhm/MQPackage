@@ -46,7 +46,7 @@ fn main() -> Result<()> {
     let fs: VfsPath = PhysicalFS::new(PathBuf::from(&root)).into();
     let config =
         Config::load(&fs).with_context(|| format!("invalid target directory '{}'", root))?;
-    let mut pkg = MQPkg::new(config, fs, root.clone().into_string())
+    let mut pkg = MQPkg::new(config, fs, root.as_str())
         .with_context(|| format!("could not initialize in '{}'", root))?;
 
     match &cli.command {

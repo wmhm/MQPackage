@@ -4,8 +4,7 @@
 
 use std::clone::Clone;
 use std::cmp::{Eq, PartialEq};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use std::str::FromStr;
 
 use semver::VersionReq;
@@ -109,8 +108,10 @@ pub struct MQPkg {
 }
 
 impl MQPkg {
-    pub fn new(_config: config::Config, fs: VfsPath, rid: String) -> Result<MQPkg, MQPkgError> {
-        let id = hashed(&rid);
+    pub fn new(_config: config::Config, fs: VfsPath, rid: &str) -> Result<MQPkg, MQPkgError> {
+        // We're using MD5 here because it's short and fast, we're not using
+        // this in a security sensitive aspect.
+        let id = format!("{:x}", md5::compute(rid));
         let db = pkgdb::Database::new(fs, id)?;
 
         Ok(MQPkg { db })
@@ -125,10 +126,4 @@ impl MQPkg {
 
         Ok(())
     }
-}
-
-fn hashed<T: Hash>(t: &T) -> String {
-    let mut s = DefaultHasher::new();
-    t.hash(&mut s);
-    format!("{:x}", s.finish())
 }
