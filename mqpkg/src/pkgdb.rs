@@ -4,13 +4,17 @@
 
 use std::collections::HashMap;
 use std::default::Default;
+use std::mem::drop;
 
 use semver::VersionReq;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use vfs::VfsPath;
 
-use super::{PackageName, PackageSpecifier};
+use crate::pkgdb::transactions::{Transaction, TransactionManager};
+use crate::{PackageName, PackageSpecifier};
+
+pub mod transactions;
 
 const PKGDB_DIR: &str = "pkgdb";
 const STATE_FILE: &str = "state.yml";
@@ -22,6 +26,12 @@ pub enum DBError {
 
     #[error("could not parse state.yml")]
     InvalidState { source: serde_yaml::Error },
+
+    #[error("could not initiate transaction")]
+    TransactionError(#[from] transactions::TransactionError),
+
+    #[error("no transaction")]
+    NoTransaction,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -36,34 +46,8 @@ struct State {
     requested: HashMap<PackageName, PackageRequest>,
 }
 
-type DBResult<T> = Result<T, DBError>;
-
-pub struct Database {
-    fs: VfsPath,
-    state: State,
-}
-
-impl Database {
-    pub fn new(fs: VfsPath) -> DBResult<Database> {
-        let state = Database::load_state(&fs)?;
-        Ok(Database { fs, state })
-    }
-
-    pub fn add(&mut self, package: &PackageSpecifier) -> DBResult<()> {
-        self.state.requested.insert(
-            package.name.clone(),
-            PackageRequest {
-                name: package.name.clone(),
-                version: package.version.clone(),
-            },
-        );
-        self.save_state()?;
-        Ok(())
-    }
-}
-
-impl Database {
-    fn load_state(fs: &VfsPath) -> DBResult<State> {
+impl State {
+    fn load(fs: &VfsPath) -> DBResult<State> {
         let filename = state_path(fs)?;
         let state: State = if filename.is_file()? {
             serde_yaml::from_reader(filename.open_file()?)
@@ -77,13 +61,81 @@ impl Database {
         Ok(state)
     }
 
-    fn save_state(&self) -> DBResult<()> {
-        ensure_dir(&pkgdb_path(&self.fs)?)?;
+    fn save(&self, fs: &VfsPath) -> DBResult<()> {
+        ensure_dir(&pkgdb_path(fs)?)?;
 
-        let file = state_path(&self.fs)?.create_file()?;
-        serde_yaml::to_writer(file, &self.state)
-            .map_err(|source| DBError::InvalidState { source })?;
+        let file = state_path(fs)?.create_file()?;
+        serde_yaml::to_writer(file, self).map_err(|source| DBError::InvalidState { source })?;
         Ok(())
+    }
+}
+
+type DBResult<T> = Result<T, DBError>;
+
+pub struct Database {
+    id: String,
+    fs: VfsPath,
+    state: Option<State>,
+}
+
+impl Database {
+    pub fn new(fs: VfsPath, id: String) -> DBResult<Database> {
+        Ok(Database {
+            id,
+            fs,
+            state: None,
+        })
+    }
+
+    pub fn add(&mut self, package: &PackageSpecifier) -> DBResult<()> {
+        self.state()?.requested.insert(
+            package.name.clone(),
+            PackageRequest {
+                name: package.name.clone(),
+                version: package.version.clone(),
+            },
+        );
+        Ok(())
+    }
+
+    pub(crate) fn transaction(&self) -> DBResult<TransactionManager> {
+        Ok(TransactionManager::new(&self.id)?)
+    }
+
+    pub(crate) fn begin<'r>(&mut self, txnm: &'r TransactionManager) -> DBResult<Transaction<'r>> {
+        Ok(txnm.begin()?)
+    }
+
+    pub(crate) fn commit(&mut self, txn: Transaction) -> DBResult<()> {
+        let fs = self.fs.clone();
+
+        // Save all our various pieces of data that we've built up in our
+        // transaction.
+        self.state()?.save(&fs)?;
+        self.state = None;
+
+        // Drop our transaction, which unlocks everything, and ensures that
+        // our transaction is open to everyone to use again. We could just
+        // let the fact that txn moved into commit auto drop this, but this
+        // documents our intent more, rather than just having an unused
+        // parameter.
+        drop(txn);
+
+        Ok(())
+    }
+}
+
+impl Database {
+    fn in_transaction(&self) -> DBResult<bool> {
+        Ok(self.transaction()?.is_active()?)
+    }
+
+    fn state(&mut self) -> DBResult<&mut State> {
+        if self.in_transaction()? && self.state.is_none() {
+            self.state = Some(State::load(&self.fs)?);
+        }
+
+        self.state.as_mut().ok_or(DBError::NoTransaction)
     }
 }
 
