@@ -4,13 +4,16 @@
 
 use std::clone::Clone;
 use std::cmp::{Eq, PartialEq};
-use std::hash::Hash;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 
 use semver::VersionReq;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use vfs::VfsPath;
+
+use crate::pkgdb::transactions::transaction;
 
 pub mod config;
 
@@ -106,17 +109,26 @@ pub struct MQPkg {
 }
 
 impl MQPkg {
-    pub fn new(_config: config::Config, fs: VfsPath) -> Result<MQPkg, MQPkgError> {
-        let db = pkgdb::Database::new(fs)?;
+    pub fn new(_config: config::Config, fs: VfsPath, rid: String) -> Result<MQPkg, MQPkgError> {
+        let id = hashed(&rid);
+        let db = pkgdb::Database::new(fs, id)?;
 
         Ok(MQPkg { db })
     }
 
     pub fn install(&mut self, packages: &[PackageSpecifier]) -> Result<(), MQPkgError> {
-        for package in packages {
-            self.db.add(package)?;
-        }
+        transaction!(self.db, {
+            for package in packages {
+                self.db.add(package)?;
+            }
+        });
 
         Ok(())
     }
+}
+
+fn hashed<T: Hash>(t: &T) -> String {
+    let mut s = DefaultHasher::new();
+    t.hash(&mut s);
+    format!("{:x}", s.finish())
 }
