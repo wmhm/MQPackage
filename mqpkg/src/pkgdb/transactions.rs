@@ -2,7 +2,7 @@
 // 2.0, and the BSD License. See the LICENSE file in the root of this repository
 // for complete details.
 
-use named_lock::{NamedLock, NamedLockGuard};
+use named_lock::{Error as NLError, NamedLock, NamedLockGuard};
 use thiserror::Error;
 
 macro_rules! transaction {
@@ -34,11 +34,6 @@ pub(crate) struct TransactionManager {
     lock: NamedLock,
 }
 
-#[derive(Debug)]
-pub struct Transaction<'r> {
-    _guard: NamedLockGuard<'r>,
-}
-
 impl TransactionManager {
     pub(super) fn new(id: &str) -> Result<TransactionManager, TransactionError> {
         Ok(TransactionManager {
@@ -51,4 +46,19 @@ impl TransactionManager {
             _guard: self.lock.lock()?,
         })
     }
+
+    pub(super) fn is_active(&self) -> Result<bool, TransactionError> {
+        match self.lock.try_lock() {
+            Ok(_) => Ok(false),
+            Err(e) => match e {
+                NLError::WouldBlock => Ok(true),
+                e => Err(TransactionError::LockError(e)),
+            },
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Transaction<'r> {
+    _guard: NamedLockGuard<'r>,
 }

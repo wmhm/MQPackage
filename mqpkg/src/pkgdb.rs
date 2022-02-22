@@ -29,6 +29,9 @@ pub enum DBError {
 
     #[error("could not initiate transaction")]
     TransactionError(#[from] transactions::TransactionError),
+
+    #[error("no transaction")]
+    NoTransaction,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -72,17 +75,20 @@ type DBResult<T> = Result<T, DBError>;
 pub struct Database {
     id: String,
     fs: VfsPath,
-    state: State,
+    state: Option<State>,
 }
 
 impl Database {
     pub fn new(fs: VfsPath, id: String) -> DBResult<Database> {
-        let state = State::load(&fs)?;
-        Ok(Database { id, fs, state })
+        Ok(Database {
+            id,
+            fs,
+            state: None,
+        })
     }
 
     pub fn add(&mut self, package: &PackageSpecifier) -> DBResult<()> {
-        self.state.requested.insert(
+        self.state()?.requested.insert(
             package.name.clone(),
             PackageRequest {
                 name: package.name.clone(),
@@ -96,12 +102,17 @@ impl Database {
         Ok(TransactionManager::new(&self.id)?)
     }
 
-    pub(crate) fn begin<'r>(&self, txnm: &'r TransactionManager) -> DBResult<Transaction<'r>> {
+    pub(crate) fn begin<'r>(&mut self, txnm: &'r TransactionManager) -> DBResult<Transaction<'r>> {
         Ok(txnm.begin()?)
     }
 
-    pub(crate) fn commit(&self, txn: Transaction) -> DBResult<()> {
-        self.state.save(&self.fs)?;
+    pub(crate) fn commit(&mut self, txn: Transaction) -> DBResult<()> {
+        let fs = self.fs.clone();
+
+        // Save all our various pieces of data that we've built up in our
+        // transaction.
+        self.state()?.save(&fs)?;
+        self.state = None;
 
         // Drop our transaction, which unlocks everything, and ensures that
         // our transaction is open to everyone to use again. We could just
@@ -111,6 +122,20 @@ impl Database {
         drop(txn);
 
         Ok(())
+    }
+}
+
+impl Database {
+    fn in_transaction(&self) -> DBResult<bool> {
+        Ok(self.transaction()?.is_active()?)
+    }
+
+    fn state(&mut self) -> DBResult<&mut State> {
+        if self.in_transaction()? && self.state.is_none() {
+            self.state = Some(State::load(&self.fs)?);
+        }
+
+        self.state.as_mut().ok_or(DBError::NoTransaction)
     }
 }
 
