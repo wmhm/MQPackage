@@ -198,7 +198,8 @@ impl MQPkg {
                 requested.insert(req.name.clone(), req.version.clone());
             }
 
-            self.resolve(requested)?;
+            // Resolve all of our requirements to a full set of packages that we should install
+            let _solution = self.resolve(requested)?;
         });
 
         Ok(())
