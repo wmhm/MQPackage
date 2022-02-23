@@ -104,149 +104,131 @@ pub enum ComparatorError {
 fn convert(comp: &semver::Comparator) -> Result<Range<Version>, ComparatorError> {
     let major = comp.major;
     match comp.op {
-        semver::Op::Exact => {
-            match (comp.minor, comp.patch) {
-                //  =I.J.K — exactly the version I.J.K
-                (Some(minor), Some(patch)) => Ok(Range::exact(Version::new(major, minor, patch))),
-                // =I.J — equivalent to >=I.J.0, <I.(J+1).0
-                (Some(minor), None) => Ok(Range::between(
-                    Version::new(major, minor, 0),
-                    Version::new(major, minor + 1, 0),
-                )),
-                // =I — equivalent to >=I.0.0, <(I+1).0.0
-                (None, None) => Ok(Range::between(
-                    Version::new(major, 0, 0),
-                    Version::new(major + 1, 0, 0),
-                )),
-                _ => Err(ComparatorError::InvalidVersion),
+        semver::Op::Exact => match (comp.minor, comp.patch) {
+            //  =I.J.K — exactly the version I.J.K
+            (Some(minor), Some(patch)) => Ok(Range::exact(Version::new(major, minor, patch))),
+            // =I.J — equivalent to >=I.J.0, <I.(J+1).0
+            (Some(minor), None) => Ok(Range::between(
+                Version::new(major, minor, 0),
+                Version::new(major, minor + 1, 0),
+            )),
+            // =I — equivalent to >=I.0.0, <(I+1).0.0
+            (None, None) => Ok(Range::between(
+                Version::new(major, 0, 0),
+                Version::new(major + 1, 0, 0),
+            )),
+            _ => Err(ComparatorError::InvalidVersion),
+        },
+        semver::Op::Greater => match (comp.minor, comp.patch) {
+            // >I.J.K
+            (Some(minor), Some(patch)) => {
+                Ok(Range::higher_than(Version::new(major, minor, patch + 1)))
             }
-        }
-        semver::Op::Greater => {
-            match (comp.minor, comp.patch) {
-                // >I.J.K
-                (Some(minor), Some(patch)) => {
-                    Ok(Range::higher_than(Version::new(major, minor, patch + 1)))
+            // >I.J — equivalent to >=I.(J+1).0
+            (Some(minor), None) => Ok(Range::higher_than(Version::new(major, minor + 1, 0))),
+            // >I — equivalent to >=(I+1).0.0
+            (None, None) => Ok(Range::higher_than(Version::new(major + 1, 0, 0))),
+            _ => Err(ComparatorError::InvalidVersion),
+        },
+        semver::Op::GreaterEq => match (comp.minor, comp.patch) {
+            //  >=I.J.K
+            (Some(minor), Some(patch)) => Ok(Range::higher_than(Version::new(major, minor, patch))),
+            // >=I.J — equivalent to >=I.J.0
+            (Some(minor), None) => Ok(Range::higher_than(Version::new(major, minor, 0))),
+            // >=I — equivalent to >=I.0.0
+            (None, None) => Ok(Range::higher_than(Version::new(major, 0, 0))),
+            _ => Err(ComparatorError::InvalidVersion),
+        },
+        semver::Op::Less => match (comp.minor, comp.patch) {
+            // <I.J.K
+            (Some(minor), Some(patch)) => Ok(Range::strictly_lower_than(Version::new(
+                major, minor, patch,
+            ))),
+            // <I.J — equivalent to <I.J.0
+            (Some(minor), None) => Ok(Range::strictly_lower_than(Version::new(major, minor, 0))),
+            // <I — equivalent to <I.0.0
+            (None, None) => Ok(Range::strictly_lower_than(Version::new(major, 0, 0))),
+            _ => Err(ComparatorError::InvalidVersion),
+        },
+        semver::Op::LessEq => match (comp.minor, comp.patch) {
+            // <=I.J.K — equivalent to <I.J.(K+1)
+            (Some(minor), Some(patch)) => Ok(Range::strictly_lower_than(Version::new(
+                major,
+                minor,
+                patch + 1,
+            ))),
+            // <=I.J — equivalent to <I.(J+1).0
+            (Some(minor), None) => Ok(Range::strictly_lower_than(Version::new(
+                major,
+                minor + 1,
+                0,
+            ))),
+            // <=I — equivalent to <(I+1).0.0
+            (None, None) => Ok(Range::strictly_lower_than(Version::new(major + 1, 0, 0))),
+            _ => Err(ComparatorError::InvalidVersion),
+        },
+        semver::Op::Tilde => match (comp.minor, comp.patch) {
+            // ~I.J.K — equivalent to >=I.J.K, <I.(J+1).0
+            (Some(minor), Some(patch)) => Ok(Range::between(
+                Version::new(major, minor, patch),
+                Version::new(major, minor + 1, 0),
+            )),
+            // ~I.J — equivalent to =I.J
+            (Some(minor), None) => Ok(Range::between(
+                Version::new(major, minor, 0),
+                Version::new(major, minor + 1, 0),
+            )),
+            // ~I — equivalent to =I
+            (None, None) => Ok(Range::between(
+                Version::new(major, 0, 0),
+                Version::new(major + 1, 0, 0),
+            )),
+            _ => Err(ComparatorError::InvalidVersion),
+        },
+        semver::Op::Caret => match (comp.minor, comp.patch) {
+            (Some(minor), Some(patch)) => {
+                if major > 0 {
+                    // ^I.J.K (for I>0) — equivalent to >=I.J.K, <(I+1).0.0
+                    Ok(Range::between(
+                        Version::new(major, minor, patch),
+                        Version::new(major + 1, 0, 0),
+                    ))
+                } else if minor > 0 {
+                    // ^0.J.K (for J>0) — equivalent to >=0.J.K, <0.(J+1).0
+                    assert!(major == 0);
+                    Ok(Range::between(
+                        Version::new(0, minor, patch),
+                        Version::new(0, minor + 1, 0),
+                    ))
+                } else {
+                    // ^0.0.K — equivalent to =0.0.K
+                    assert!(major == 0 && minor == 0);
+                    Ok(Range::exact(Version::new(0, 0, patch)))
                 }
-                // >I.J — equivalent to >=I.(J+1).0
-                (Some(minor), None) => Ok(Range::higher_than(Version::new(major, minor + 1, 0))),
-                // >I — equivalent to >=(I+1).0.0
-                (None, None) => Ok(Range::higher_than(Version::new(major + 1, 0, 0))),
-                _ => Err(ComparatorError::InvalidVersion),
             }
-        }
-        semver::Op::GreaterEq => {
-            match (comp.minor, comp.patch) {
-                //  >=I.J.K
-                (Some(minor), Some(patch)) => {
-                    Ok(Range::higher_than(Version::new(major, minor, patch)))
+            (Some(minor), None) => {
+                if major > 0 || minor > 0 {
+                    // ^I.J (for I>0 or J>0) — equivalent to ^I.J.0
+                    Ok(Range::between(
+                        Version::new(major, minor, 0),
+                        Version::new(major + 1, 0, 0),
+                    ))
+                } else {
+                    // ^0.0 — equivalent to =0.0
+                    assert!(major == 0 && minor == 0);
+                    Ok(Range::between(
+                        Version::new(major, minor, 0),
+                        Version::new(major, minor + 1, 0),
+                    ))
                 }
-                // >=I.J — equivalent to >=I.J.0
-                (Some(minor), None) => Ok(Range::higher_than(Version::new(major, minor, 0))),
-                // >=I — equivalent to >=I.0.0
-                (None, None) => Ok(Range::higher_than(Version::new(major, 0, 0))),
-                _ => Err(ComparatorError::InvalidVersion),
             }
-        }
-        semver::Op::Less => {
-            match (comp.minor, comp.patch) {
-                // <I.J.K
-                (Some(minor), Some(patch)) => Ok(Range::strictly_lower_than(Version::new(
-                    major, minor, patch,
-                ))),
-                // <I.J — equivalent to <I.J.0
-                (Some(minor), None) => {
-                    Ok(Range::strictly_lower_than(Version::new(major, minor, 0)))
-                }
-                // <I — equivalent to <I.0.0
-                (None, None) => Ok(Range::strictly_lower_than(Version::new(major, 0, 0))),
-                _ => Err(ComparatorError::InvalidVersion),
-            }
-        }
-        semver::Op::LessEq => {
-            match (comp.minor, comp.patch) {
-                // <=I.J.K — equivalent to <I.J.(K+1)
-                (Some(minor), Some(patch)) => Ok(Range::strictly_lower_than(Version::new(
-                    major,
-                    minor,
-                    patch + 1,
-                ))),
-                // <=I.J — equivalent to <I.(J+1).0
-                (Some(minor), None) => Ok(Range::strictly_lower_than(Version::new(
-                    major,
-                    minor + 1,
-                    0,
-                ))),
-                // <=I — equivalent to <(I+1).0.0
-                (None, None) => Ok(Range::strictly_lower_than(Version::new(major + 1, 0, 0))),
-                _ => Err(ComparatorError::InvalidVersion),
-            }
-        }
-        semver::Op::Tilde => {
-            match (comp.minor, comp.patch) {
-                // ~I.J.K — equivalent to >=I.J.K, <I.(J+1).0
-                (Some(minor), Some(patch)) => Ok(Range::between(
-                    Version::new(major, minor, patch),
-                    Version::new(major, minor + 1, 0),
-                )),
-                // ~I.J — equivalent to =I.J
-                (Some(minor), None) => Ok(Range::between(
-                    Version::new(major, minor, 0),
-                    Version::new(major, minor + 1, 0),
-                )),
-                // ~I — equivalent to =I
-                (None, None) => Ok(Range::between(
-                    Version::new(major, 0, 0),
-                    Version::new(major + 1, 0, 0),
-                )),
-                _ => Err(ComparatorError::InvalidVersion),
-            }
-        }
-        semver::Op::Caret => {
-            match (comp.minor, comp.patch) {
-                (Some(minor), Some(patch)) => {
-                    if major > 0 {
-                        // ^I.J.K (for I>0) — equivalent to >=I.J.K, <(I+1).0.0
-                        Ok(Range::between(
-                            Version::new(major, minor, patch),
-                            Version::new(major + 1, 0, 0),
-                        ))
-                    } else if minor > 0 {
-                        // ^0.J.K (for J>0) — equivalent to >=0.J.K, <0.(J+1).0
-                        assert!(major == 0);
-                        Ok(Range::between(
-                            Version::new(0, minor, patch),
-                            Version::new(0, minor + 1, 0),
-                        ))
-                    } else {
-                        // ^0.0.K — equivalent to =0.0.K
-                        assert!(major == 0 && minor == 0);
-                        Ok(Range::exact(Version::new(0, 0, patch)))
-                    }
-                }
-                (Some(minor), None) => {
-                    if major > 0 || minor > 0 {
-                        // ^I.J (for I>0 or J>0) — equivalent to ^I.J.0
-                        Ok(Range::between(
-                            Version::new(major, minor, 0),
-                            Version::new(major + 1, 0, 0),
-                        ))
-                    } else {
-                        // ^0.0 — equivalent to =0.0
-                        assert!(major == 0 && minor == 0);
-                        Ok(Range::between(
-                            Version::new(major, minor, 0),
-                            Version::new(major, minor + 1, 0),
-                        ))
-                    }
-                }
-                // ^I — equivalent to =I
-                (None, None) => Ok(Range::between(
-                    Version::new(major, 0, 0),
-                    Version::new(major + 1, 0, 0),
-                )),
-                _ => Err(ComparatorError::InvalidVersion),
-            }
-        }
+            // ^I — equivalent to =I
+            (None, None) => Ok(Range::between(
+                Version::new(major, 0, 0),
+                Version::new(major + 1, 0, 0),
+            )),
+            _ => Err(ComparatorError::InvalidVersion),
+        },
         semver::Op::Wildcard => match (comp.minor, comp.patch) {
             (Some(_), Some(_)) => Err(ComparatorError::InvalidWildcard),
             (Some(minor), None) => Ok(Range::between(
