@@ -32,9 +32,6 @@ const ROOT_VER: (u64, u64, u64) = (1, 0, 0);
 pub enum SolverError {
     #[error("No solution")]
     NoSolution(Box<DerivedResult>),
-
-    #[error("noop")]
-    Noop,
 }
 
 impl SolverError {
