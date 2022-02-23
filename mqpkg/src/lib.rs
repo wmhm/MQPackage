@@ -17,6 +17,8 @@ use vfs::VfsPath;
 
 use crate::pkgdb::transactions::transaction;
 
+pub use crate::resolver::SolverError;
+
 pub mod config;
 
 mod pkgdb;

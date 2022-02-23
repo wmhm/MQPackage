@@ -91,7 +91,7 @@ impl Repository {
         Ok(self)
     }
 
-    pub(crate) fn versions(&self, package: &PackageName) -> impl Iterator<Item = Version> {
+    pub(crate) fn versions(&self, package: &PackageName) -> Vec<Version> {
         let mut versions = Vec::<Version>::new();
         let mut seen = HashSet::<Version>::new();
 
@@ -109,7 +109,7 @@ impl Repository {
         // We want to put the newest version first, this will make sure that our resolver
         // will do intelligent things, like trying the newest version.
         versions.sort_unstable_by(|l, r| l.cmp(r).reverse());
-        versions.into_iter()
+        versions
     }
 
     pub(crate) fn dependencies(

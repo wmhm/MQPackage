@@ -4,10 +4,11 @@
 
 use std::borrow::Borrow;
 use std::collections::HashMap;
+use std::fmt;
 
 use pubgrub::error::PubGrubError;
 use pubgrub::range::Range;
-use pubgrub::report::DerivationTree;
+use pubgrub::report::{DefaultStringReporter, DerivationTree, Reporter};
 use pubgrub::solver::{
     choose_package_with_fewest_versions, resolve, Dependencies, DependencyConstraints,
     DependencyProvider,
@@ -22,15 +23,18 @@ use crate::{PackageName, Version};
 // Note: The name used here **MUST** be an invalid name for packages to have,
 //       if it's not, then our root package (which represents this stuff the
 //       used has asked for) will collide with a real package.
-const ROOT_NAME: &str = ":root:";
+const ROOT_NAME: &str = ":requested:";
 // Note: The actual version doesn't matter here. This is just a marker so that
 //       we can resolve the packages that the user has depended on.
-const ROOT_VER: (u64, u64, u64) = (0, 0, 0);
+const ROOT_VER: (u64, u64, u64) = (1, 0, 0);
 
 #[derive(Error, Debug)]
 pub enum SolverError {
     #[error("No solution")]
-    NoSolution(Box<DerivationTree<PackageName, Version>>),
+    NoSolution(Box<DerivedResult>),
+
+    #[error("noop")]
+    Noop,
 }
 
 impl SolverError {
@@ -40,11 +44,41 @@ impl SolverError {
             _ => panic!("unhandled error"),
         }
     }
+
+    pub fn humanized<S: Into<String>>(msg: S, dt: DerivedResult) -> HumanizedNoSolutionError {
+        HumanizedNoSolutionError {
+            msg: msg.into(),
+            dt,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct HumanizedNoSolutionError {
+    msg: String,
+    dt: DerivedResult,
+}
+
+impl fmt::Display for HumanizedNoSolutionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}\n\n", self.msg.as_str())?;
+        writeln!(f, "{}", DefaultStringReporter::report(&self.dt))?;
+
+        Ok(())
+    }
+}
+
+impl std::error::Error for HumanizedNoSolutionError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
+    }
 }
 
 pub(crate) type Solution = SelectedDependencies<PackageName, Version>;
 
 pub(crate) type Requested = HashMap<PackageName, VersionReq>;
+
+pub(crate) type DerivedResult = DerivationTree<PackageName, Version>;
 
 pub(crate) struct Solver {
     repository: Repository,
@@ -87,7 +121,14 @@ impl<'r> DependencyProvider<PackageName, Version> for InternalSolver<'r> {
         potential_packages: impl Iterator<Item = (T, U)>,
     ) -> Result<(T, Option<Version>), Box<dyn std::error::Error>> {
         Ok(choose_package_with_fewest_versions(
-            |p| self.repository.versions(p),
+            |package| {
+                if package == &self.root {
+                    vec![Version::new(ROOT_VER.0, ROOT_VER.1, ROOT_VER.2)]
+                } else {
+                    self.repository.versions(package)
+                }
+                .into_iter()
+            },
             potential_packages,
         ))
     }
@@ -106,20 +147,24 @@ impl<'r> DependencyProvider<PackageName, Version> for InternalSolver<'r> {
         };
 
         for (dep, req) in dependencies {
-            for comp in req.comparators.iter() {
-                match convert(comp) {
-                    Ok(new) => merge(&mut result, &dep, new),
-                    Err(e) => match e {
-                        ComparatorError::InvalidVersion => {
-                            panic!("version with no minor but a patch: {:?}", req)
-                        }
-                        ComparatorError::UnknownOperator => {
-                            panic!("unknown semver operator: {:?}", req)
-                        }
-                        ComparatorError::InvalidWildcard => {
-                            panic!("invalid wildcard: {:?}", req)
-                        }
-                    },
+            if req.comparators.is_empty() {
+                merge(&mut result, &dep, Range::any())
+            } else {
+                for comp in req.comparators.iter() {
+                    match convert(comp) {
+                        Ok(new) => merge(&mut result, &dep, new),
+                        Err(e) => match e {
+                            ComparatorError::InvalidVersion => {
+                                panic!("version with no minor but a patch: {:?}", req)
+                            }
+                            ComparatorError::UnknownOperator => {
+                                panic!("unknown semver operator: {:?}", req)
+                            }
+                            ComparatorError::InvalidWildcard => {
+                                panic!("invalid wildcard: {:?}", req)
+                            }
+                        },
+                    }
                 }
             }
         }
