@@ -87,10 +87,6 @@ impl Version {
     fn new(major: u64, minor: u64, patch: u64) -> Version {
         Version(SemanticVersion::new(major, minor, patch))
     }
-
-    fn parse(value: &str) -> Result<Version, VersionError> {
-        Version::from_str(value)
-    }
 }
 
 impl FromStr for Version {
