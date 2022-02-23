@@ -31,20 +31,24 @@ pub enum RepositoryError {
 
 #[derive(Deserialize, Debug)]
 struct MetaData {
-    name: String,
+    #[serde(rename = "name")]
+    _name: String,
 }
 
 #[derive(Deserialize, Debug)]
 struct Release {
     #[serde(default)]
     dependencies: HashMap<PackageName, VersionReq>,
-    urls: Vec<Url>,
-    digests: HashMap<String, String>,
+    #[serde(rename = "urls")]
+    _urls: Vec<Url>,
+    #[serde(rename = "digests")]
+    _digests: HashMap<String, String>,
 }
 
 #[derive(Deserialize, Debug)]
 pub(super) struct RepoData {
-    meta: MetaData,
+    #[serde(rename = "meta")]
+    _meta: MetaData,
     packages: HashMap<PackageName, HashMap<Version, Release>>,
 }
 
