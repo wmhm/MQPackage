@@ -34,10 +34,10 @@ pub enum DBError {
     NoTransaction,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct PackageRequest {
-    name: PackageName,
-    version: VersionReq,
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub(crate) struct PackageRequest {
+    pub(crate) name: PackageName,
+    pub(crate) version: VersionReq,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug)]
@@ -122,6 +122,10 @@ impl Database {
             },
         );
         Ok(())
+    }
+
+    pub(crate) fn requested(&mut self) -> DBResult<&HashMap<PackageName, PackageRequest>> {
+        Ok(&self.state()?.requested)
     }
 }
 

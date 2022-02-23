@@ -4,6 +4,7 @@
 
 use std::clone::Clone;
 use std::cmp::{Eq, Ord, PartialEq};
+use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
 use std::str::FromStr;
@@ -186,11 +187,20 @@ impl MQPkg {
 
     pub fn install(&mut self, packages: &[PackageSpecifier]) -> Result<(), MQPkgError> {
         transaction!(self.db, {
+            // Add all of the packages being requested to the set of all requested packages.
             for package in packages {
                 self.db.add(package)?;
             }
 
-            self.resolve()?;
+            // Get all of the requested packages, we need this to ensure that this install
+            // doesn't invalidate any of the version requirements of the already requested
+            // packages.
+            let mut requested = HashMap::new();
+            for req in self.db.requested()?.values() {
+                requested.insert(req.name.clone(), req.version.clone());
+            }
+
+            self.resolve(requested)?;
         });
 
         Ok(())
@@ -198,10 +208,10 @@ impl MQPkg {
 }
 
 impl MQPkg {
-    fn resolve(&self) -> Result<resolver::Solution, MQPkgError> {
+    fn resolve(&self, requested: resolver::Requested) -> Result<resolver::Solution, MQPkgError> {
         let repository = repository::Repository::new()?.fetch(self.config.repositories())?;
         let solver = resolver::Solver::new(repository);
-        let solution = solver.resolve()?;
+        let solution = solver.resolve(requested)?;
 
         Ok(solution)
     }

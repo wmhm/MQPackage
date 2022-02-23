@@ -3,6 +3,7 @@
 // for complete details.
 
 use std::borrow::Borrow;
+use std::collections::HashMap;
 
 use pubgrub::error::PubGrubError;
 use pubgrub::range::Range;
@@ -12,10 +13,19 @@ use pubgrub::solver::{
     DependencyProvider,
 };
 use pubgrub::type_aliases::SelectedDependencies;
+use semver::VersionReq;
 use thiserror::Error;
 
 use crate::repository::Repository;
 use crate::{PackageName, Version};
+
+// Note: The name used here **MUST** be an invalid name for packages to have,
+//       if it's not, then our root package (which represents this stuff the
+//       used has asked for) will collide with a real package.
+const ROOT_NAME: &str = ":root:";
+// Note: The actual version doesn't matter here. This is just a marker so that
+//       we can resolve the packages that the user has depended on.
+const ROOT_VER: (u64, u64, u64) = (0, 0, 0);
 
 #[derive(Error, Debug)]
 pub enum SolverError {
@@ -34,6 +44,8 @@ impl SolverError {
 
 pub(crate) type Solution = SelectedDependencies<PackageName, Version>;
 
+pub(crate) type Requested = HashMap<PackageName, VersionReq>;
+
 pub(crate) struct Solver {
     repository: Repository,
 }
@@ -43,22 +55,33 @@ impl Solver {
         Solver { repository }
     }
 
-    pub(crate) fn resolve(&self) -> Result<Solution, SolverError> {
-        // Note: The name used here **MUST** be an invalid name for packages to have,
-        //       if it's not, then our root package (which represents this stuff the
-        //       used has asked for) will collide with a real package.
-        let package = PackageName(":root:".to_string());
+    pub(crate) fn resolve(&self, reqs: Requested) -> Result<Solution, SolverError> {
+        let package = PackageName(ROOT_NAME.to_string());
+        let version = Version::new(ROOT_VER.0, ROOT_VER.1, ROOT_VER.2);
 
-        // Note: The actual version doesn't matter here. This is just a marker so that
-        //       we can resolve the packages that the user has depended on.
-        let version = Version::new(1, 0, 0);
+        let resolver = InternalSolver {
+            repository: &self.repository,
+            root: package.clone(),
+            requested: reqs,
+        };
 
-        // Actually run things through the pubgrub resolver.
-        resolve(self, package, version).map_err(SolverError::from_pubgrub)
+        resolve(&resolver, package, version).map_err(SolverError::from_pubgrub)
     }
 }
 
-impl DependencyProvider<PackageName, Version> for Solver {
+// Internal Solver keeps us from having to carefully maintain state, and let's us
+// rely on the rust lifetime mechanic for that. We construct a new InternalSolver
+// anytime that Solver::resolve is ran, which means that items that we don't want
+// to persist between runs will only live on the InternalSolver. Anything we want
+// to persist long term, lives on the Solver and gets passed into InternalSolver
+// as a reference.
+struct InternalSolver<'r> {
+    repository: &'r Repository,
+    root: PackageName,
+    requested: Requested,
+}
+
+impl<'r> DependencyProvider<PackageName, Version> for InternalSolver<'r> {
     fn choose_package_version<T: Borrow<PackageName>, U: Borrow<Range<Version>>>(
         &self,
         potential_packages: impl Iterator<Item = (T, U)>,
@@ -74,12 +97,18 @@ impl DependencyProvider<PackageName, Version> for Solver {
         package: &PackageName,
         version: &Version,
     ) -> Result<Dependencies<PackageName, Version>, Box<dyn std::error::Error>> {
-        let mut deps = DependencyConstraints::<PackageName, Version>::default();
+        let mut result = DependencyConstraints::<PackageName, Version>::default();
 
-        for (dep, req) in self.repository.dependencies(package, version) {
+        let dependencies = if package == &self.root {
+            self.requested.clone()
+        } else {
+            self.repository.dependencies(package, version)
+        };
+
+        for (dep, req) in dependencies {
             for comp in req.comparators.iter() {
                 match convert(comp) {
-                    Ok(new) => merge(&mut deps, &dep, new),
+                    Ok(new) => merge(&mut result, &dep, new),
                     Err(e) => match e {
                         ComparatorError::InvalidVersion => {
                             panic!("version with no minor but a patch: {:?}", req)
@@ -95,7 +124,7 @@ impl DependencyProvider<PackageName, Version> for Solver {
             }
         }
 
-        Ok(Dependencies::Known(deps))
+        Ok(Dependencies::Known(result))
     }
 }
 
