@@ -5,7 +5,6 @@
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::BufReader;
-use std::iter::Iterator;
 
 use indexmap::IndexMap;
 use reqwest::blocking::Client as HTTPClient;
