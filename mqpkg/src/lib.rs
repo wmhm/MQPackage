@@ -83,6 +83,10 @@ pub enum VersionError {
 struct Version(SemanticVersion);
 
 impl Version {
+    fn new(major: u64, minor: u64, patch: u64) -> Version {
+        Version(SemanticVersion::new(major, minor, patch))
+    }
+
     fn parse(value: &str) -> Result<Version, VersionError> {
         Version::from_str(value)
     }
@@ -192,9 +196,7 @@ impl MQPkg {
 
 impl MQPkg {
     fn resolve(&self) -> Result<(), MQPkgError> {
-        let mut repository = repository::Repository::new()?;
-        repository.fetch(self.config.repositories())?;
-
+        let repository = repository::Repository::new()?.fetch(self.config.repositories())?;
         let solver = resolver::Solver::new(repository);
         let solution = solver.resolve(PackageName(".".to_string()), Version::parse("1.0.0")?);
 

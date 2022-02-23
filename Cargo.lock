@@ -571,6 +571,7 @@ name = "mqpkg"
 version = "0.1.0"
 dependencies = [
  "camino",
+ "indexmap",
  "md5",
  "named-lock",
  "pubgrub",

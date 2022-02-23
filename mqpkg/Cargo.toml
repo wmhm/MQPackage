@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 camino = "1.0.7"
+indexmap = "1.8.0"
 md5 = "0.7.0"
 named-lock = "0.1.1"
 pubgrub = "0.2.1"

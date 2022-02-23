@@ -2,11 +2,12 @@
 // 2.0, and the BSD License. See the LICENSE file in the root of this repository
 // for complete details.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::BufReader;
 use std::iter::Iterator;
 
+use indexmap::IndexMap;
 use reqwest::blocking::Client as HTTPClient;
 use semver::VersionReq;
 use serde::Deserialize;
@@ -15,25 +16,6 @@ use url::Url;
 
 use crate::config;
 use crate::{PackageName, Version};
-
-#[derive(Deserialize, Debug)]
-struct MetaData {
-    name: String,
-}
-
-#[derive(Deserialize, Debug)]
-struct PackageData {
-    #[serde(default)]
-    dependencies: HashMap<PackageName, VersionReq>,
-    urls: Vec<Url>,
-    digests: HashMap<String, String>,
-}
-
-#[derive(Deserialize, Debug)]
-pub(super) struct RepoData {
-    meta: MetaData,
-    packages: HashMap<PackageName, HashMap<Version, PackageData>>,
-}
 
 #[derive(Error, Debug)]
 pub enum RepositoryError {
@@ -47,21 +29,43 @@ pub enum RepositoryError {
     IoError(#[from] std::io::Error),
 }
 
+#[derive(Deserialize, Debug)]
+struct MetaData {
+    name: String,
+}
+
+#[derive(Deserialize, Debug)]
+struct Release {
+    #[serde(default)]
+    dependencies: HashMap<PackageName, VersionReq>,
+    urls: Vec<Url>,
+    digests: HashMap<String, String>,
+}
+
+#[derive(Deserialize, Debug)]
+pub(super) struct RepoData {
+    meta: MetaData,
+    packages: HashMap<PackageName, HashMap<Version, Release>>,
+}
+
 #[derive(Debug)]
 pub(crate) struct Repository {
     client: HTTPClient,
-    data: HashMap<String, RepoData>,
+    data: IndexMap<String, RepoData>,
 }
 
 impl Repository {
     pub(crate) fn new() -> Result<Repository, RepositoryError> {
         let client = HTTPClient::builder().gzip(true).build()?;
-        let data = HashMap::<String, RepoData>::new();
+        let data = IndexMap::<String, RepoData>::new();
 
         Ok(Repository { client, data })
     }
 
-    pub(crate) fn fetch(&mut self, repos: &[config::Repository]) -> Result<(), RepositoryError> {
+    pub(crate) fn fetch(
+        mut self,
+        repos: &[config::Repository],
+    ) -> Result<Repository, RepositoryError> {
         for repo in repos.iter() {
             let data: RepoData = match repo.url.scheme() {
                 "file" => {
@@ -80,12 +84,27 @@ impl Repository {
             self.data.insert(repo.name.clone(), data);
         }
 
-        Ok(())
+        Ok(self)
     }
 
     pub(crate) fn versions(&self, package: &PackageName) -> impl Iterator<Item = Version> {
         let mut versions = Vec::<Version>::new();
+        let mut seen = HashSet::<Version>::new();
 
+        for data in self.data.values() {
+            if let Some(packages) = data.packages.get(package) {
+                for version in packages.keys() {
+                    if seen.get(version).is_none() {
+                        seen.insert(version.clone());
+                        versions.push(version.clone());
+                    }
+                }
+            }
+        }
+
+        // We want to put the newest version first, this will make sure that our resolver
+        // will do intelligent things, like trying the newest version.
+        versions.sort_unstable_by(|l, r| l.cmp(r).reverse());
         versions.into_iter()
     }
 
@@ -93,7 +112,19 @@ impl Repository {
         &self,
         package: &PackageName,
         version: &Version,
-    ) -> Result<HashMap<PackageName, VersionReq>, RepositoryError> {
-        Ok(HashMap::new())
+    ) -> HashMap<PackageName, VersionReq> {
+        let mut deps = HashMap::new();
+
+        for data in self.data.values() {
+            if let Some(packages) = data.packages.get(package) {
+                if let Some(release) = packages.get(version) {
+                    for (key, value) in release.dependencies.iter() {
+                        deps.insert(key.clone(), value.clone());
+                    }
+                }
+            }
+        }
+
+        deps
     }
 }
