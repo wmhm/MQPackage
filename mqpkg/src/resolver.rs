@@ -43,11 +43,17 @@ impl Solver {
         Solver { repository }
     }
 
-    pub(crate) fn resolve(
-        &self,
-        package: PackageName,
-        version: Version,
-    ) -> Result<Solution, SolverError> {
+    pub(crate) fn resolve(&self) -> Result<Solution, SolverError> {
+        // Note: The name used here **MUST** be an invalid name for packages to have,
+        //       if it's not, then our root package (which represents this stuff the
+        //       used has asked for) will collide with a real package.
+        let package = PackageName(":root:".to_string());
+
+        // Note: The actual version doesn't matter here. This is just a marker so that
+        //       we can resolve the packages that the user has depended on.
+        let version = Version::new(1, 0, 0);
+
+        // Actually run things through the pubgrub resolver.
         resolve(self, package, version).map_err(SolverError::from_pubgrub)
     }
 }

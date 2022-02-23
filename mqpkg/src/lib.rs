@@ -201,7 +201,7 @@ impl MQPkg {
     fn resolve(&self) -> Result<resolver::Solution, MQPkgError> {
         let repository = repository::Repository::new()?.fetch(self.config.repositories())?;
         let solver = resolver::Solver::new(repository);
-        let solution = solver.resolve(PackageName(".".to_string()), Version::parse("1.0.0")?)?;
+        let solution = solver.resolve()?;
 
         Ok(solution)
     }
