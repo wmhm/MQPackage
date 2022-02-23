@@ -87,17 +87,6 @@ impl Database {
         })
     }
 
-    pub fn add(&mut self, package: &PackageSpecifier) -> DBResult<()> {
-        self.state()?.requested.insert(
-            package.name.clone(),
-            PackageRequest {
-                name: package.name.clone(),
-                version: package.version.clone(),
-            },
-        );
-        Ok(())
-    }
-
     pub(crate) fn transaction(&self) -> DBResult<TransactionManager> {
         Ok(TransactionManager::new(&self.id)?)
     }
@@ -121,6 +110,17 @@ impl Database {
         // parameter.
         drop(txn);
 
+        Ok(())
+    }
+
+    pub(crate) fn add(&mut self, package: &PackageSpecifier) -> DBResult<()> {
+        self.state()?.requested.insert(
+            package.name.clone(),
+            PackageRequest {
+                name: package.name.clone(),
+                version: package.version.clone(),
+            },
+        );
         Ok(())
     }
 }
