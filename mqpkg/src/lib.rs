@@ -80,7 +80,7 @@ pub enum VersionError {
 }
 
 #[derive(Deserialize, Debug, Clone, Ord, Eq, PartialEq, PartialOrd, Hash)]
-struct Version(SemanticVersion);
+pub struct Version(SemanticVersion);
 
 impl Version {
     fn new(major: u64, minor: u64, patch: u64) -> Version {
@@ -164,6 +164,9 @@ pub enum MQPkgError {
 
     #[error(transparent)]
     VersionError(#[from] VersionError),
+
+    #[error("error attempting to resolve dependencies")]
+    ResolverError(#[from] resolver::SolverError),
 }
 
 pub struct MQPkg {
@@ -195,13 +198,11 @@ impl MQPkg {
 }
 
 impl MQPkg {
-    fn resolve(&self) -> Result<(), MQPkgError> {
+    fn resolve(&self) -> Result<resolver::Solution, MQPkgError> {
         let repository = repository::Repository::new()?.fetch(self.config.repositories())?;
         let solver = resolver::Solver::new(repository);
-        let solution = solver.resolve(PackageName(".".to_string()), Version::parse("1.0.0")?);
+        let solution = solver.resolve(PackageName(".".to_string()), Version::parse("1.0.0")?)?;
 
-        println!("{:?}", solution);
-
-        Ok(())
+        Ok(solution)
     }
 }

@@ -6,6 +6,7 @@ use std::borrow::Borrow;
 
 use pubgrub::error::PubGrubError;
 use pubgrub::range::Range;
+use pubgrub::report::DerivationTree;
 use pubgrub::solver::{
     choose_package_with_fewest_versions, resolve, Dependencies, DependencyConstraints,
     DependencyProvider,
@@ -15,6 +16,23 @@ use thiserror::Error;
 
 use crate::repository::Repository;
 use crate::{PackageName, Version};
+
+#[derive(Error, Debug)]
+pub enum SolverError {
+    #[error("No solution")]
+    NoSolution(Box<DerivationTree<PackageName, Version>>),
+}
+
+impl SolverError {
+    fn from_pubgrub(err: PubGrubError<PackageName, Version>) -> Self {
+        match err {
+            PubGrubError::NoSolution(dt) => SolverError::NoSolution(Box::new(dt)),
+            _ => panic!("unhandled error"),
+        }
+    }
+}
+
+pub(crate) type Solution = SelectedDependencies<PackageName, Version>;
 
 pub(crate) struct Solver {
     repository: Repository,
@@ -29,9 +47,8 @@ impl Solver {
         &self,
         package: PackageName,
         version: Version,
-    ) -> Result<SelectedDependencies<PackageName, Version>, PubGrubError<PackageName, Version>>
-    {
-        resolve(self, package, version)
+    ) -> Result<Solution, SolverError> {
+        resolve(self, package, version).map_err(SolverError::from_pubgrub)
     }
 }
 
