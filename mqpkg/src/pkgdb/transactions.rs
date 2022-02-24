@@ -6,24 +6,6 @@ use named_lock::{Error as NLError, NamedLock, NamedLockGuard};
 
 use crate::errors::TransactionError;
 
-macro_rules! transaction {
-    ($db:expr, $body:block) => {{
-        let __txnm = $db.transaction()?;
-        let __txn = $db.begin(&__txnm)?;
-        let __result = $body;
-
-        $db.commit(__txn)?;
-
-        __result
-    }};
-
-    ($db:expr, $body:expr) => {{
-        transaction!($db, { $body })
-    }};
-}
-
-pub(crate) use transaction;
-
 type Result<T, E = TransactionError> = core::result::Result<T, E>;
 
 #[derive(Debug)]

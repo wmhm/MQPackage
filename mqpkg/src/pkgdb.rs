@@ -14,7 +14,7 @@ use crate::errors::DBError;
 use crate::pkgdb::transactions::{Transaction, TransactionManager};
 use crate::types::{PackageName, PackageSpecifier};
 
-pub mod transactions;
+mod transactions;
 
 const PKGDB_DIR: &str = "pkgdb";
 const STATE_FILE: &str = "state.yml";
@@ -143,3 +143,21 @@ fn ensure_dir(path: &VfsPath) -> Result<()> {
 
     Ok(())
 }
+
+macro_rules! transaction {
+    ($db:expr, $body:block) => {{
+        let __txnm = $db.transaction()?;
+        let __txn = $db.begin(&__txnm)?;
+        let __result = $body;
+
+        $db.commit(__txn)?;
+
+        __result
+    }};
+
+    ($db:expr, $body:expr) => {{
+        transaction!($db, { $body })
+    }};
+}
+
+pub(crate) use transaction;

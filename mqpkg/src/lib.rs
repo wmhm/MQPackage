@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use vfs::VfsPath;
 
 use crate::errors::MQPkgError;
-use crate::pkgdb::transactions::transaction;
+use crate::pkgdb::transaction;
 use crate::types::{RequestedPackages, SolverSolution};
 
 pub use crate::config::Config;
