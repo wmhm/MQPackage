@@ -7,29 +7,14 @@ use std::str::FromStr;
 use camino::Utf8PathBuf;
 use serde::Deserialize;
 use serde_with::{serde_as, DisplayFromStr, PickFirst};
-use thiserror::Error;
 use url::Url;
 use vfs::VfsPath;
 
-pub const CONFIG_FILENAME: &str = "mqpkg.yml";
+use crate::errors::ConfigError;
 
-#[derive(Error, Debug)]
-pub enum ConfigError {
-    #[error("no configuration file")]
-    NoConfig { source: vfs::VfsError },
+const CONFIG_FILENAME: &str = "mqpkg.yml";
 
-    #[error("invalid configuration")]
-    InvalidConfig { source: serde_yaml::Error },
-
-    #[error("invalid url")]
-    InvalidURL { source: url::ParseError },
-
-    #[error("unable to traverse directory")]
-    DirectoryTraversalError { source: vfs::VfsError },
-
-    #[error("unable to locate a valid directory")]
-    NoTargetDirectoryFound,
-}
+type Result<T, E = ConfigError> = core::result::Result<T, E>;
 
 #[derive(Deserialize, Debug, Clone)]
 pub(crate) struct Repository {
@@ -56,7 +41,11 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load(root: &VfsPath) -> Result<Config, ConfigError> {
+    pub fn filename() -> &'static str {
+        CONFIG_FILENAME
+    }
+
+    pub fn load(root: &VfsPath) -> Result<Config> {
         let file = root
             .join(CONFIG_FILENAME)
             .map_err(|source| ConfigError::NoConfig { source })?
@@ -68,27 +57,29 @@ impl Config {
         Ok(config)
     }
 
-    pub(crate) fn repositories(&self) -> &[Repository] {
-        &self.repositories
+    pub fn find<P>(path: P) -> Result<Utf8PathBuf>
+    where
+        P: Into<Utf8PathBuf>,
+    {
+        let mut path = path.into();
+        loop {
+            path.push(CONFIG_FILENAME);
+            if path.is_file() {
+                assert!(path.pop());
+                break Ok(path);
+            }
+
+            // Remove the filename, and the parent, and
+            // if that's not successful, it's an error.
+            if !(path.pop() && path.pop()) {
+                return Err(ConfigError::NoTargetDirectoryFound);
+            }
+        }
     }
 }
 
-pub fn find_config_dir<P>(path: P) -> Result<Utf8PathBuf, ConfigError>
-where
-    P: Into<Utf8PathBuf>,
-{
-    let mut path = path.into();
-    loop {
-        path.push(CONFIG_FILENAME);
-        if path.is_file() {
-            assert!(path.pop());
-            break Ok(path);
-        }
-
-        // Remove the filename, and the parent, and
-        // if that's not successful, it's an error.
-        if !(path.pop() && path.pop()) {
-            return Err(ConfigError::NoTargetDirectoryFound);
-        }
+impl Config {
+    pub(crate) fn repositories(&self) -> &[Repository] {
+        &self.repositories
     }
 }

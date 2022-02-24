@@ -3,22 +3,21 @@
 // for complete details.
 
 use std::borrow::Borrow;
-use std::collections::HashMap;
 use std::fmt;
 
 use pubgrub::error::PubGrubError;
 use pubgrub::range::Range;
-use pubgrub::report::{DefaultStringReporter, DerivationTree, Reporter};
+use pubgrub::report::{DefaultStringReporter, Reporter};
 use pubgrub::solver::{
     choose_package_with_fewest_versions, resolve, Dependencies, DependencyConstraints,
     DependencyProvider,
 };
-use pubgrub::type_aliases::SelectedDependencies;
-use semver::VersionReq;
+use pubgrub::version::Version as RVersion;
 use thiserror::Error;
 
+use crate::errors::SolverError;
 use crate::repository::Repository;
-use crate::{PackageName, Version};
+use crate::types::{DerivedResult, PackageName, RequestedPackages, SolverSolution, Version};
 
 // Note: The name used here **MUST** be an invalid name for packages to have,
 //       if it's not, then our root package (which represents this stuff the
@@ -28,40 +27,6 @@ const ROOT_NAME: &str = ":requested:";
 // Note: The actual version doesn't matter here. This is just a marker so that
 //       we can resolve the packages that the user has depended on.
 const ROOT_VER: (u64, u64, u64) = (1, 0, 0);
-
-#[derive(Error, Debug)]
-pub enum SolverError {
-    #[error("No solution")]
-    NoSolution(Box<DerivedResult>),
-
-    #[error("Package {dependent} required by {package} {version} depends on the empty set")]
-    DependencyOnTheEmptySet {
-        /// Package whose dependencies we want.
-        package: PackageName,
-        /// Version of the package for which we want the dependencies.
-        version: Version,
-        /// The dependent package that requires us to pick from the empty set.
-        dependent: PackageName,
-    },
-
-    #[error("{package} {version} depends on itself")]
-    SelfDependency {
-        /// Package whose dependencies we want.
-        package: PackageName,
-        /// Version of the package for which we want the dependencies.
-        version: Version,
-    },
-
-    // PubGrubError has a Failure error, and I'm not sure where it would actually
-    // be used at, so we're going to just replicate it ourselves.
-    #[error("{0}")]
-    Failure(String),
-
-    // These errors shouldn't actually be possible, because our implementation
-    // of our dependency provider makes sure of that.
-    #[error("impossible error")]
-    Impossible,
-}
 
 impl SolverError {
     fn from_pubgrub(err: PubGrubError<PackageName, Version>) -> Self {
@@ -94,6 +59,16 @@ impl SolverError {
     }
 }
 
+impl RVersion for Version {
+    fn lowest() -> Version {
+        Version::new(0, 0, 0)
+    }
+
+    fn bump(&self) -> Version {
+        Version::new(self.major(), self.minor(), self.patch() + 1)
+    }
+}
+
 #[derive(Debug)]
 pub struct HumanizedNoSolutionError {
     msg: String,
@@ -115,12 +90,6 @@ impl std::error::Error for HumanizedNoSolutionError {
     }
 }
 
-pub(crate) type Solution = SelectedDependencies<PackageName, Version>;
-
-pub(crate) type Requested = HashMap<PackageName, VersionReq>;
-
-pub(crate) type DerivedResult = DerivationTree<PackageName, Version>;
-
 pub(crate) struct Solver {
     repository: Repository,
 }
@@ -130,8 +99,8 @@ impl Solver {
         Solver { repository }
     }
 
-    pub(crate) fn resolve(&self, reqs: Requested) -> Result<Solution, SolverError> {
-        let package = PackageName(ROOT_NAME.to_string());
+    pub(crate) fn resolve(&self, reqs: RequestedPackages) -> Result<SolverSolution, SolverError> {
+        let package = PackageName::new(ROOT_NAME);
         let version = Version::new(ROOT_VER.0, ROOT_VER.1, ROOT_VER.2);
 
         let resolver = InternalSolver {
@@ -153,7 +122,7 @@ impl Solver {
 struct InternalSolver<'r> {
     repository: &'r Repository,
     root: PackageName,
-    requested: Requested,
+    requested: RequestedPackages,
 }
 
 impl<'r> DependencyProvider<PackageName, Version> for InternalSolver<'r> {
@@ -228,7 +197,7 @@ fn merge(
 }
 
 #[derive(Error, Debug)]
-pub enum ComparatorError {
+enum ComparatorError {
     #[error("version with no minor but a patch")]
     InvalidVersion,
 

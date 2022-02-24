@@ -9,8 +9,7 @@ use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
 use vfs::{PhysicalFS, VfsPath};
 
-use mqpkg::config::{find_config_dir, Config, CONFIG_FILENAME};
-use mqpkg::{MQPkg, MQPkgError, PackageSpecifier, SolverError};
+use mqpkg::{Config, Installer, InstallerError, PackageSpecifier, SolverError};
 
 #[derive(Parser, Debug)]
 #[clap(version)]
@@ -36,23 +35,23 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let root = match cli.target {
         Some(target) => canonicalize(target)?,
-        None => find_config_dir(current_dir()?).with_context(|| {
+        None => Config::find(current_dir()?).with_context(|| {
             format!(
                 "unable to find '{}' in current directory or parents",
-                CONFIG_FILENAME
+                Config::filename()
             )
         })?,
     };
     let fs: VfsPath = PhysicalFS::new(PathBuf::from(&root)).into();
     let config =
         Config::load(&fs).with_context(|| format!("invalid target directory '{}'", root))?;
-    let mut pkg = MQPkg::new(config, fs, root.as_str())
+    let mut pkg = Installer::new(config, fs, root.as_str())
         .with_context(|| format!("could not initialize in '{}'", root))?;
 
     match &cli.command {
         Commands::Install { packages } => match pkg.install(packages) {
             Ok(v) => Ok(v),
-            Err(MQPkgError::ResolverError(SolverError::NoSolution(mut dt))) => {
+            Err(InstallerError::ResolverError(SolverError::NoSolution(mut dt))) => {
                 dt.collapse_no_versions();
                 Err(SolverError::humanized(
                     "unable to resolve packages to a set that satisfies all requirements",

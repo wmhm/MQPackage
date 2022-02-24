@@ -3,187 +3,43 @@
 // for complete details.
 
 use std::clone::Clone;
-use std::cmp::{Eq, Ord, PartialEq};
 use std::collections::HashMap;
-use std::fmt;
-use std::hash::Hash;
-use std::str::FromStr;
 
-use pubgrub::version::Version as RVersion;
-use semver::{Version as SemanticVersion, VersionReq};
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use vfs::VfsPath;
 
-use crate::pkgdb::transactions::transaction;
+use crate::pkgdb::transaction;
+use crate::types::{RequestedPackages, SolverSolution};
 
-pub use crate::resolver::SolverError;
+pub use crate::config::Config;
+pub use crate::errors::{InstallerError, SolverError};
+pub use crate::types::PackageSpecifier;
 
-pub mod config;
+pub(crate) mod types;
 
+mod config;
+mod errors;
 mod pkgdb;
 mod repository;
 mod resolver;
 
-#[derive(Error, Debug)]
-pub enum PackageNameError {
-    #[error("names must have at least one character")]
-    TooShort,
+type Result<T, E = InstallerError> = core::result::Result<T, E>;
 
-    #[error("names must begin with an alpha character")]
-    NoStartingAlpha { name: String, character: String },
-
-    #[error("names must contain only alphanumeric characters")]
-    InvalidCharacter { name: String, character: String },
-}
-
-#[derive(Serialize, Deserialize, Clone, Eq, Debug, Hash, PartialEq)]
-pub struct PackageName(String);
-
-impl fmt::Display for PackageName {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl FromStr for PackageName {
-    type Err = PackageNameError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        // Check that the first letter is only alpha, and if we don't have
-        // a first letter, then this is invalid anyways.
-        if !value.starts_with(|c: char| c.is_ascii_alphabetic()) {
-            return match value.chars().next() {
-                Some(c) => Err(PackageNameError::NoStartingAlpha {
-                    name: value.to_string(),
-                    character: c.to_string(),
-                }),
-                None => Err(PackageNameError::TooShort),
-            };
-        }
-
-        // Iterate over the rest of our letters, and make sure that they're alphanumeric
-        for c in value.chars() {
-            if !c.is_ascii_alphanumeric() {
-                return Err(PackageNameError::InvalidCharacter {
-                    name: value.to_string(),
-                    character: c.to_string(),
-                });
-            }
-        }
-
-        Ok(PackageName(value.to_ascii_lowercase()))
-    }
-}
-
-#[derive(Error, Debug)]
-pub enum VersionError {
-    #[error(transparent)]
-    ParseError(#[from] semver::Error),
-}
-
-#[derive(Deserialize, Debug, Clone, Ord, Eq, PartialEq, PartialOrd, Hash)]
-pub struct Version(SemanticVersion);
-
-impl Version {
-    fn new(major: u64, minor: u64, patch: u64) -> Version {
-        Version(SemanticVersion::new(major, minor, patch))
-    }
-}
-
-impl FromStr for Version {
-    type Err = VersionError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        Ok(Version(SemanticVersion::parse(value)?))
-    }
-}
-
-impl fmt::Display for Version {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl RVersion for Version {
-    fn lowest() -> Version {
-        Version(SemanticVersion::new(0, 0, 0))
-    }
-
-    fn bump(&self) -> Version {
-        Version(SemanticVersion::new(
-            self.0.major,
-            self.0.minor,
-            self.0.patch + 1,
-        ))
-    }
-}
-
-#[derive(Error, Debug)]
-pub enum PackageSpecifierError {
-    #[error("specifier must have a package name")]
-    NoPackageName,
-
-    #[error(transparent)]
-    InvalidPackageName(#[from] PackageNameError),
-
-    #[error(transparent)]
-    InvalidVersionRequirement(#[from] semver::Error),
-}
-
-#[derive(Serialize, Deserialize, Clone, Eq, Debug, Hash, PartialEq)]
-pub struct PackageSpecifier {
-    name: PackageName,
-    version: VersionReq,
-}
-
-impl FromStr for PackageSpecifier {
-    type Err = PackageSpecifierError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        let (name_s, version_s) = match value.find(|c: char| !c.is_ascii_alphanumeric()) {
-            Some(idx) => value.split_at(idx),
-            None => (value, "*"),
-        };
-
-        let name: PackageName = name_s.parse()?;
-        let version: VersionReq = version_s.parse()?;
-
-        Ok(PackageSpecifier { name, version })
-    }
-}
-
-#[derive(Error, Debug)]
-pub enum MQPkgError {
-    #[error(transparent)]
-    DBError(#[from] pkgdb::DBError),
-
-    #[error(transparent)]
-    RepositoryError(#[from] repository::RepositoryError),
-
-    #[error(transparent)]
-    VersionError(#[from] VersionError),
-
-    #[error("error attempting to resolve dependencies")]
-    ResolverError(#[from] resolver::SolverError),
-}
-
-pub struct MQPkg {
+pub struct Installer {
     config: config::Config,
     db: pkgdb::Database,
 }
 
-impl MQPkg {
-    pub fn new(config: config::Config, fs: VfsPath, rid: &str) -> Result<MQPkg, MQPkgError> {
+impl Installer {
+    pub fn new(config: config::Config, fs: VfsPath, rid: &str) -> Result<Installer> {
         // We're using MD5 here because it's short and fast, we're not using
         // this in a security sensitive aspect.
         let id = format!("{:x}", md5::compute(rid));
         let db = pkgdb::Database::new(fs, id)?;
 
-        Ok(MQPkg { config, db })
+        Ok(Installer { config, db })
     }
 
-    pub fn install(&mut self, packages: &[PackageSpecifier]) -> Result<(), MQPkgError> {
+    pub fn install(&mut self, packages: &[PackageSpecifier]) -> Result<()> {
         transaction!(self.db, {
             // Add all of the packages being requested to the set of all requested packages.
             for package in packages {
@@ -206,8 +62,8 @@ impl MQPkg {
     }
 }
 
-impl MQPkg {
-    fn resolve(&self, requested: resolver::Requested) -> Result<resolver::Solution, MQPkgError> {
+impl Installer {
+    fn resolve(&self, requested: RequestedPackages) -> Result<SolverSolution> {
         let repository = repository::Repository::new()?.fetch(self.config.repositories())?;
         let solver = resolver::Solver::new(repository);
         let solution = solver.resolve(requested)?;

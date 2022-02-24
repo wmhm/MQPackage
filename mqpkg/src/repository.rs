@@ -10,23 +10,13 @@ use indexmap::IndexMap;
 use reqwest::blocking::Client as HTTPClient;
 use semver::VersionReq;
 use serde::Deserialize;
-use thiserror::Error;
 use url::Url;
 
 use crate::config;
-use crate::{PackageName, Version};
+use crate::errors::RepositoryError;
+use crate::types::{PackageName, Version};
 
-#[derive(Error, Debug)]
-pub enum RepositoryError {
-    #[error(transparent)]
-    HTTPError(#[from] reqwest::Error),
-
-    #[error("could not parse JSON data")]
-    Deserialize(#[from] serde_json::Error),
-
-    #[error("could not access local file")]
-    IoError(#[from] std::io::Error),
-}
+type Result<T, E = RepositoryError> = core::result::Result<T, E>;
 
 #[derive(Deserialize, Debug)]
 struct MetaData {
@@ -45,7 +35,7 @@ struct Release {
 }
 
 #[derive(Deserialize, Debug)]
-pub(super) struct RepoData {
+struct RepoData {
     #[serde(rename = "meta")]
     _meta: MetaData,
     packages: HashMap<PackageName, HashMap<Version, Release>>,
@@ -58,17 +48,14 @@ pub(crate) struct Repository {
 }
 
 impl Repository {
-    pub(crate) fn new() -> Result<Repository, RepositoryError> {
+    pub(crate) fn new() -> Result<Repository> {
         let client = HTTPClient::builder().gzip(true).build()?;
         let data = IndexMap::<String, RepoData>::new();
 
         Ok(Repository { client, data })
     }
 
-    pub(crate) fn fetch(
-        mut self,
-        repos: &[config::Repository],
-    ) -> Result<Repository, RepositoryError> {
+    pub(crate) fn fetch(mut self, repos: &[config::Repository]) -> Result<Repository> {
         for repo in repos.iter() {
             let data: RepoData = match repo.url.scheme() {
                 "file" => {
