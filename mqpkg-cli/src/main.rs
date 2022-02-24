@@ -9,8 +9,7 @@ use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
 use vfs::{PhysicalFS, VfsPath};
 
-use mqpkg::errors::{MQPkgError, SolverError};
-use mqpkg::{Config, MQPkg, PackageSpecifier};
+use mqpkg::{Config, Installer, InstallerError, PackageSpecifier, SolverError};
 
 #[derive(Parser, Debug)]
 #[clap(version)]
@@ -46,13 +45,13 @@ fn main() -> Result<()> {
     let fs: VfsPath = PhysicalFS::new(PathBuf::from(&root)).into();
     let config =
         Config::load(&fs).with_context(|| format!("invalid target directory '{}'", root))?;
-    let mut pkg = MQPkg::new(config, fs, root.as_str())
+    let mut pkg = Installer::new(config, fs, root.as_str())
         .with_context(|| format!("could not initialize in '{}'", root))?;
 
     match &cli.command {
         Commands::Install { packages } => match pkg.install(packages) {
             Ok(v) => Ok(v),
-            Err(MQPkgError::ResolverError(SolverError::NoSolution(mut dt))) => {
+            Err(InstallerError::ResolverError(SolverError::NoSolution(mut dt))) => {
                 dt.collapse_no_versions();
                 Err(SolverError::humanized(
                     "unable to resolve packages to a set that satisfies all requirements",

@@ -7,36 +7,36 @@ use std::collections::HashMap;
 
 use vfs::VfsPath;
 
-use crate::errors::MQPkgError;
 use crate::pkgdb::transaction;
 use crate::types::{RequestedPackages, SolverSolution};
 
 pub use crate::config::Config;
+pub use crate::errors::{InstallerError, SolverError};
 pub use crate::types::PackageSpecifier;
 
-pub mod errors;
 pub(crate) mod types;
 
 mod config;
+mod errors;
 mod pkgdb;
 mod repository;
 mod resolver;
 
-type Result<T, E = MQPkgError> = core::result::Result<T, E>;
+type Result<T, E = InstallerError> = core::result::Result<T, E>;
 
-pub struct MQPkg {
+pub struct Installer {
     config: config::Config,
     db: pkgdb::Database,
 }
 
-impl MQPkg {
-    pub fn new(config: config::Config, fs: VfsPath, rid: &str) -> Result<MQPkg> {
+impl Installer {
+    pub fn new(config: config::Config, fs: VfsPath, rid: &str) -> Result<Installer> {
         // We're using MD5 here because it's short and fast, we're not using
         // this in a security sensitive aspect.
         let id = format!("{:x}", md5::compute(rid));
         let db = pkgdb::Database::new(fs, id)?;
 
-        Ok(MQPkg { config, db })
+        Ok(Installer { config, db })
     }
 
     pub fn install(&mut self, packages: &[PackageSpecifier]) -> Result<()> {
@@ -62,7 +62,7 @@ impl MQPkg {
     }
 }
 
-impl MQPkg {
+impl Installer {
     fn resolve(&self, requested: RequestedPackages) -> Result<SolverSolution> {
         let repository = repository::Repository::new()?.fetch(self.config.repositories())?;
         let solver = resolver::Solver::new(repository);

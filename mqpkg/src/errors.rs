@@ -7,9 +7,9 @@ use thiserror::Error;
 use crate::types::{DerivedResult, PackageName, Version};
 
 #[derive(Error, Debug)]
-pub enum MQPkgError {
+pub enum InstallerError {
     #[error(transparent)]
-    DBError(#[from] DBError),
+    DatabaseError(#[from] DBError),
 
     #[error(transparent)]
     RepositoryError(#[from] RepositoryError),
