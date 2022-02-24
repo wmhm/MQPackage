@@ -3,124 +3,23 @@
 // for complete details.
 
 use std::clone::Clone;
-use std::cmp::{Eq, Ord, PartialEq};
 use std::collections::HashMap;
-use std::fmt;
-use std::hash::Hash;
-use std::str::FromStr;
 
-use pubgrub::version::Version as RVersion;
-use semver::{Version as SemanticVersion, VersionReq};
-use serde::{Deserialize, Serialize};
 use vfs::VfsPath;
 
-use crate::errors::{MQPkgError, PackageNameError, PackageSpecifierError, VersionError};
+use crate::errors::MQPkgError;
 use crate::pkgdb::transactions::transaction;
+use crate::types::{RequestedPackages, SolverSolution};
+
+pub use crate::types::PackageSpecifier;
 
 pub mod config;
 pub mod errors;
+pub(crate) mod types;
 
 mod pkgdb;
 mod repository;
 mod resolver;
-
-#[derive(Serialize, Deserialize, Clone, Eq, Debug, Hash, PartialEq)]
-pub struct PackageName(String);
-
-impl fmt::Display for PackageName {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl FromStr for PackageName {
-    type Err = PackageNameError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        // Check that the first letter is only alpha, and if we don't have
-        // a first letter, then this is invalid anyways.
-        if !value.starts_with(|c: char| c.is_ascii_alphabetic()) {
-            return match value.chars().next() {
-                Some(c) => Err(PackageNameError::NoStartingAlpha {
-                    name: value.to_string(),
-                    character: c.to_string(),
-                }),
-                None => Err(PackageNameError::TooShort),
-            };
-        }
-
-        // Iterate over the rest of our letters, and make sure that they're alphanumeric
-        for c in value.chars() {
-            if !c.is_ascii_alphanumeric() {
-                return Err(PackageNameError::InvalidCharacter {
-                    name: value.to_string(),
-                    character: c.to_string(),
-                });
-            }
-        }
-
-        Ok(PackageName(value.to_ascii_lowercase()))
-    }
-}
-
-#[derive(Deserialize, Debug, Clone, Ord, Eq, PartialEq, PartialOrd, Hash)]
-pub struct Version(SemanticVersion);
-
-impl Version {
-    fn new(major: u64, minor: u64, patch: u64) -> Version {
-        Version(SemanticVersion::new(major, minor, patch))
-    }
-}
-
-impl FromStr for Version {
-    type Err = VersionError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        Ok(Version(SemanticVersion::parse(value)?))
-    }
-}
-
-impl fmt::Display for Version {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl RVersion for Version {
-    fn lowest() -> Version {
-        Version(SemanticVersion::new(0, 0, 0))
-    }
-
-    fn bump(&self) -> Version {
-        Version(SemanticVersion::new(
-            self.0.major,
-            self.0.minor,
-            self.0.patch + 1,
-        ))
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Eq, Debug, Hash, PartialEq)]
-pub struct PackageSpecifier {
-    name: PackageName,
-    version: VersionReq,
-}
-
-impl FromStr for PackageSpecifier {
-    type Err = PackageSpecifierError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        let (name_s, version_s) = match value.find(|c: char| !c.is_ascii_alphanumeric()) {
-            Some(idx) => value.split_at(idx),
-            None => (value, "*"),
-        };
-
-        let name: PackageName = name_s.parse()?;
-        let version: VersionReq = version_s.parse()?;
-
-        Ok(PackageSpecifier { name, version })
-    }
-}
 
 pub struct MQPkg {
     config: config::Config,
@@ -161,7 +60,7 @@ impl MQPkg {
 }
 
 impl MQPkg {
-    fn resolve(&self, requested: resolver::Requested) -> Result<resolver::Solution, MQPkgError> {
+    fn resolve(&self, requested: RequestedPackages) -> Result<SolverSolution, MQPkgError> {
         let repository = repository::Repository::new()?.fetch(self.config.repositories())?;
         let solver = resolver::Solver::new(repository);
         let solution = solver.resolve(requested)?;

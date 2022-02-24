@@ -14,7 +14,7 @@ use url::Url;
 
 use crate::config;
 use crate::errors::RepositoryError;
-use crate::{PackageName, Version};
+use crate::types::{PackageName, Version};
 
 #[derive(Deserialize, Debug)]
 struct MetaData {

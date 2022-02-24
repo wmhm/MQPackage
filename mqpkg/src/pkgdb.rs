@@ -12,7 +12,7 @@ use vfs::VfsPath;
 
 use crate::errors::DBError;
 use crate::pkgdb::transactions::{Transaction, TransactionManager};
-use crate::{PackageName, PackageSpecifier};
+use crate::types::{PackageName, PackageSpecifier};
 
 pub mod transactions;
 

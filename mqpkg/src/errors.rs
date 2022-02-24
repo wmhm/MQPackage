@@ -4,8 +4,7 @@
 
 use thiserror::Error;
 
-use crate::resolver::DerivedResult;
-use crate::{PackageName, Version};
+use crate::types::{DerivedResult, PackageName, Version};
 
 #[derive(Error, Debug)]
 pub enum MQPkgError {
