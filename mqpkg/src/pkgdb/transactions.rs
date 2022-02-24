@@ -24,25 +24,27 @@ macro_rules! transaction {
 
 pub(crate) use transaction;
 
+type Result<T, E = TransactionError> = core::result::Result<T, E>;
+
 #[derive(Debug)]
 pub(crate) struct TransactionManager {
     lock: NamedLock,
 }
 
 impl TransactionManager {
-    pub(super) fn new(id: &str) -> Result<TransactionManager, TransactionError> {
+    pub(super) fn new(id: &str) -> Result<TransactionManager> {
         Ok(TransactionManager {
             lock: NamedLock::create(&format!("mqpkg.{}", id))?,
         })
     }
 
-    pub(super) fn begin(&self) -> Result<Transaction, TransactionError> {
+    pub(super) fn begin(&self) -> Result<Transaction> {
         Ok(Transaction {
             _guard: self.lock.lock()?,
         })
     }
 
-    pub(super) fn is_active(&self) -> Result<bool, TransactionError> {
+    pub(super) fn is_active(&self) -> Result<bool> {
         match self.lock.try_lock() {
             Ok(_) => Ok(false),
             Err(e) => match e {

@@ -21,13 +21,15 @@ mod pkgdb;
 mod repository;
 mod resolver;
 
+type Result<T, E = MQPkgError> = core::result::Result<T, E>;
+
 pub struct MQPkg {
     config: config::Config,
     db: pkgdb::Database,
 }
 
 impl MQPkg {
-    pub fn new(config: config::Config, fs: VfsPath, rid: &str) -> Result<MQPkg, MQPkgError> {
+    pub fn new(config: config::Config, fs: VfsPath, rid: &str) -> Result<MQPkg> {
         // We're using MD5 here because it's short and fast, we're not using
         // this in a security sensitive aspect.
         let id = format!("{:x}", md5::compute(rid));
@@ -36,7 +38,7 @@ impl MQPkg {
         Ok(MQPkg { config, db })
     }
 
-    pub fn install(&mut self, packages: &[PackageSpecifier]) -> Result<(), MQPkgError> {
+    pub fn install(&mut self, packages: &[PackageSpecifier]) -> Result<()> {
         transaction!(self.db, {
             // Add all of the packages being requested to the set of all requested packages.
             for package in packages {
@@ -60,7 +62,7 @@ impl MQPkg {
 }
 
 impl MQPkg {
-    fn resolve(&self, requested: RequestedPackages) -> Result<SolverSolution, MQPkgError> {
+    fn resolve(&self, requested: RequestedPackages) -> Result<SolverSolution> {
         let repository = repository::Repository::new()?.fetch(self.config.repositories())?;
         let solver = resolver::Solver::new(repository);
         let solution = solver.resolve(requested)?;

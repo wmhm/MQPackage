@@ -19,6 +19,8 @@ pub mod transactions;
 const PKGDB_DIR: &str = "pkgdb";
 const STATE_FILE: &str = "state.yml";
 
+type Result<T, E = DBError> = core::result::Result<T, E>;
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct PackageRequest {
     pub(crate) name: PackageName,
@@ -32,7 +34,7 @@ struct State {
 }
 
 impl State {
-    fn load(fs: &VfsPath) -> DBResult<State> {
+    fn load(fs: &VfsPath) -> Result<State> {
         let filename = state_path(fs)?;
         let state: State = if filename.is_file()? {
             serde_yaml::from_reader(filename.open_file()?)
@@ -46,7 +48,7 @@ impl State {
         Ok(state)
     }
 
-    fn save(&self, fs: &VfsPath) -> DBResult<()> {
+    fn save(&self, fs: &VfsPath) -> Result<()> {
         ensure_dir(&pkgdb_path(fs)?)?;
 
         let file = state_path(fs)?.create_file()?;
@@ -55,8 +57,6 @@ impl State {
     }
 }
 
-type DBResult<T> = Result<T, DBError>;
-
 pub struct Database {
     id: String,
     fs: VfsPath,
@@ -64,7 +64,7 @@ pub struct Database {
 }
 
 impl Database {
-    pub fn new(fs: VfsPath, id: String) -> DBResult<Database> {
+    pub fn new(fs: VfsPath, id: String) -> Result<Database> {
         Ok(Database {
             id,
             fs,
@@ -72,15 +72,15 @@ impl Database {
         })
     }
 
-    pub(crate) fn transaction(&self) -> DBResult<TransactionManager> {
+    pub(crate) fn transaction(&self) -> Result<TransactionManager> {
         Ok(TransactionManager::new(&self.id)?)
     }
 
-    pub(crate) fn begin<'r>(&mut self, txnm: &'r TransactionManager) -> DBResult<Transaction<'r>> {
+    pub(crate) fn begin<'r>(&mut self, txnm: &'r TransactionManager) -> Result<Transaction<'r>> {
         Ok(txnm.begin()?)
     }
 
-    pub(crate) fn commit(&mut self, txn: Transaction) -> DBResult<()> {
+    pub(crate) fn commit(&mut self, txn: Transaction) -> Result<()> {
         let fs = self.fs.clone();
 
         // Save all our various pieces of data that we've built up in our
@@ -98,7 +98,7 @@ impl Database {
         Ok(())
     }
 
-    pub(crate) fn add(&mut self, package: &PackageSpecifier) -> DBResult<()> {
+    pub(crate) fn add(&mut self, package: &PackageSpecifier) -> Result<()> {
         self.state()?.requested.insert(
             package.name.clone(),
             PackageRequest {
@@ -109,17 +109,17 @@ impl Database {
         Ok(())
     }
 
-    pub(crate) fn requested(&mut self) -> DBResult<&HashMap<PackageName, PackageRequest>> {
+    pub(crate) fn requested(&mut self) -> Result<&HashMap<PackageName, PackageRequest>> {
         Ok(&self.state()?.requested)
     }
 }
 
 impl Database {
-    fn in_transaction(&self) -> DBResult<bool> {
+    fn in_transaction(&self) -> Result<bool> {
         Ok(self.transaction()?.is_active()?)
     }
 
-    fn state(&mut self) -> DBResult<&mut State> {
+    fn state(&mut self) -> Result<&mut State> {
         if self.in_transaction()? && self.state.is_none() {
             self.state = Some(State::load(&self.fs)?);
         }
@@ -128,15 +128,15 @@ impl Database {
     }
 }
 
-fn pkgdb_path(fs: &VfsPath) -> DBResult<VfsPath> {
+fn pkgdb_path(fs: &VfsPath) -> Result<VfsPath> {
     Ok(fs.join(PKGDB_DIR)?)
 }
 
-fn state_path(fs: &VfsPath) -> DBResult<VfsPath> {
+fn state_path(fs: &VfsPath) -> Result<VfsPath> {
     Ok(pkgdb_path(fs)?.join(STATE_FILE)?)
 }
 
-fn ensure_dir(path: &VfsPath) -> DBResult<()> {
+fn ensure_dir(path: &VfsPath) -> Result<()> {
     if !path.is_dir()? {
         path.create_dir()?;
     }

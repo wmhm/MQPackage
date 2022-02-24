@@ -14,6 +14,8 @@ use crate::errors::ConfigError;
 
 pub const CONFIG_FILENAME: &str = "mqpkg.yml";
 
+type Result<T, E = ConfigError> = core::result::Result<T, E>;
+
 #[derive(Deserialize, Debug, Clone)]
 pub(crate) struct Repository {
     pub(crate) name: String,
@@ -39,7 +41,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load(root: &VfsPath) -> Result<Config, ConfigError> {
+    pub fn load(root: &VfsPath) -> Result<Config> {
         let file = root
             .join(CONFIG_FILENAME)
             .map_err(|source| ConfigError::NoConfig { source })?
@@ -56,7 +58,7 @@ impl Config {
     }
 }
 
-pub fn find_config_dir<P>(path: P) -> Result<Utf8PathBuf, ConfigError>
+pub fn find_config_dir<P>(path: P) -> Result<Utf8PathBuf>
 where
     P: Into<Utf8PathBuf>,
 {

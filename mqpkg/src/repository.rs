@@ -16,6 +16,8 @@ use crate::config;
 use crate::errors::RepositoryError;
 use crate::types::{PackageName, Version};
 
+type Result<T, E = RepositoryError> = core::result::Result<T, E>;
+
 #[derive(Deserialize, Debug)]
 struct MetaData {
     #[serde(rename = "name")]
@@ -46,17 +48,14 @@ pub(crate) struct Repository {
 }
 
 impl Repository {
-    pub(crate) fn new() -> Result<Repository, RepositoryError> {
+    pub(crate) fn new() -> Result<Repository> {
         let client = HTTPClient::builder().gzip(true).build()?;
         let data = IndexMap::<String, RepoData>::new();
 
         Ok(Repository { client, data })
     }
 
-    pub(crate) fn fetch(
-        mut self,
-        repos: &[config::Repository],
-    ) -> Result<Repository, RepositoryError> {
+    pub(crate) fn fetch(mut self, repos: &[config::Repository]) -> Result<Repository> {
         for repo in repos.iter() {
             let data: RepoData = match repo.url.scheme() {
                 "file" => {
