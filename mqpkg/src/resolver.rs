@@ -24,6 +24,7 @@ use crate::{PackageName, Version};
 //       if it's not, then our root package (which represents this stuff the
 //       used has asked for) will collide with a real package.
 const ROOT_NAME: &str = ":requested:";
+
 // Note: The actual version doesn't matter here. This is just a marker so that
 //       we can resolve the packages that the user has depended on.
 const ROOT_VER: (u64, u64, u64) = (1, 0, 0);
@@ -32,13 +33,56 @@ const ROOT_VER: (u64, u64, u64) = (1, 0, 0);
 pub enum SolverError {
     #[error("No solution")]
     NoSolution(Box<DerivedResult>),
+
+    #[error("Package {dependent} required by {package} {version} depends on the empty set")]
+    DependencyOnTheEmptySet {
+        /// Package whose dependencies we want.
+        package: PackageName,
+        /// Version of the package for which we want the dependencies.
+        version: Version,
+        /// The dependent package that requires us to pick from the empty set.
+        dependent: PackageName,
+    },
+
+    #[error("{package} {version} depends on itself")]
+    SelfDependency {
+        /// Package whose dependencies we want.
+        package: PackageName,
+        /// Version of the package for which we want the dependencies.
+        version: Version,
+    },
+
+    // PubGrubError has a Failure error, and I'm not sure where it would actually
+    // be used at, so we're going to just replicate it ourselves.
+    #[error("{0}")]
+    Failure(String),
+
+    // These errors shouldn't actually be possible, because our implementation
+    // of our dependency provider makes sure of that.
+    #[error("impossible error")]
+    Impossible,
 }
 
 impl SolverError {
     fn from_pubgrub(err: PubGrubError<PackageName, Version>) -> Self {
         match err {
             PubGrubError::NoSolution(dt) => SolverError::NoSolution(Box::new(dt)),
-            _ => panic!("unhandled error"),
+            PubGrubError::DependencyOnTheEmptySet {
+                package,
+                version,
+                dependent,
+            } => SolverError::DependencyOnTheEmptySet {
+                package,
+                version,
+                dependent,
+            },
+            PubGrubError::SelfDependency { package, version } => {
+                SolverError::SelfDependency { package, version }
+            }
+            PubGrubError::Failure(s) => SolverError::Failure(s),
+            PubGrubError::ErrorRetrievingDependencies { .. } => SolverError::Impossible,
+            PubGrubError::ErrorChoosingPackageVersion(_) => SolverError::Impossible,
+            PubGrubError::ErrorInShouldCancel(_) => SolverError::Impossible,
         }
     }
 
