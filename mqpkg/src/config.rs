@@ -12,7 +12,7 @@ use vfs::VfsPath;
 
 use crate::errors::ConfigError;
 
-pub const CONFIG_FILENAME: &str = "mqpkg.yml";
+const CONFIG_FILENAME: &str = "mqpkg.yml";
 
 type Result<T, E = ConfigError> = core::result::Result<T, E>;
 
@@ -41,6 +41,10 @@ pub struct Config {
 }
 
 impl Config {
+    pub fn filename() -> &'static str {
+        CONFIG_FILENAME
+    }
+
     pub fn load(root: &VfsPath) -> Result<Config> {
         let file = root
             .join(CONFIG_FILENAME)
@@ -53,27 +57,29 @@ impl Config {
         Ok(config)
     }
 
-    pub(crate) fn repositories(&self) -> &[Repository] {
-        &self.repositories
+    pub fn find<P>(path: P) -> Result<Utf8PathBuf>
+    where
+        P: Into<Utf8PathBuf>,
+    {
+        let mut path = path.into();
+        loop {
+            path.push(CONFIG_FILENAME);
+            if path.is_file() {
+                assert!(path.pop());
+                break Ok(path);
+            }
+
+            // Remove the filename, and the parent, and
+            // if that's not successful, it's an error.
+            if !(path.pop() && path.pop()) {
+                return Err(ConfigError::NoTargetDirectoryFound);
+            }
+        }
     }
 }
 
-pub fn find_config_dir<P>(path: P) -> Result<Utf8PathBuf>
-where
-    P: Into<Utf8PathBuf>,
-{
-    let mut path = path.into();
-    loop {
-        path.push(CONFIG_FILENAME);
-        if path.is_file() {
-            assert!(path.pop());
-            break Ok(path);
-        }
-
-        // Remove the filename, and the parent, and
-        // if that's not successful, it's an error.
-        if !(path.pop() && path.pop()) {
-            return Err(ConfigError::NoTargetDirectoryFound);
-        }
+impl Config {
+    pub(crate) fn repositories(&self) -> &[Repository] {
+        &self.repositories
     }
 }

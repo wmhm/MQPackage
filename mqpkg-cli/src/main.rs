@@ -9,9 +9,8 @@ use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
 use vfs::{PhysicalFS, VfsPath};
 
-use mqpkg::config::{find_config_dir, Config, CONFIG_FILENAME};
 use mqpkg::errors::{MQPkgError, SolverError};
-use mqpkg::{MQPkg, PackageSpecifier};
+use mqpkg::{Config, MQPkg, PackageSpecifier};
 
 #[derive(Parser, Debug)]
 #[clap(version)]
@@ -37,10 +36,10 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let root = match cli.target {
         Some(target) => canonicalize(target)?,
-        None => find_config_dir(current_dir()?).with_context(|| {
+        None => Config::find(current_dir()?).with_context(|| {
             format!(
                 "unable to find '{}' in current directory or parents",
-                CONFIG_FILENAME
+                Config::filename()
             )
         })?,
     };

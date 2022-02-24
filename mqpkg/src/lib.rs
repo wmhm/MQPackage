@@ -11,12 +11,13 @@ use crate::errors::MQPkgError;
 use crate::pkgdb::transactions::transaction;
 use crate::types::{RequestedPackages, SolverSolution};
 
+pub use crate::config::Config;
 pub use crate::types::PackageSpecifier;
 
-pub mod config;
 pub mod errors;
 pub(crate) mod types;
 
+mod config;
 mod pkgdb;
 mod repository;
 mod resolver;
