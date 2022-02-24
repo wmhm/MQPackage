@@ -34,10 +34,10 @@ pub enum DBError {
     NoTransaction,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct PackageRequest {
-    name: PackageName,
-    version: VersionReq,
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub(crate) struct PackageRequest {
+    pub(crate) name: PackageName,
+    pub(crate) version: VersionReq,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug)]
@@ -87,17 +87,6 @@ impl Database {
         })
     }
 
-    pub fn add(&mut self, package: &PackageSpecifier) -> DBResult<()> {
-        self.state()?.requested.insert(
-            package.name.clone(),
-            PackageRequest {
-                name: package.name.clone(),
-                version: package.version.clone(),
-            },
-        );
-        Ok(())
-    }
-
     pub(crate) fn transaction(&self) -> DBResult<TransactionManager> {
         Ok(TransactionManager::new(&self.id)?)
     }
@@ -122,6 +111,21 @@ impl Database {
         drop(txn);
 
         Ok(())
+    }
+
+    pub(crate) fn add(&mut self, package: &PackageSpecifier) -> DBResult<()> {
+        self.state()?.requested.insert(
+            package.name.clone(),
+            PackageRequest {
+                name: package.name.clone(),
+                version: package.version.clone(),
+            },
+        );
+        Ok(())
+    }
+
+    pub(crate) fn requested(&mut self) -> DBResult<&HashMap<PackageName, PackageRequest>> {
+        Ok(&self.state()?.requested)
     }
 }
 

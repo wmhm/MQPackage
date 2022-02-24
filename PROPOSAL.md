@@ -232,7 +232,7 @@ The manifest has a schema like:
         "name": "A display name for this repository"
     },
     "packages": {
-        "package name" {
+        "package name": {
             "version": {
                 "dependencies": {
                     "dependency": "specifier",
@@ -241,11 +241,11 @@ The manifest has a schema like:
                 "urls": [
                     "an url to download this package at",
                     "another url, equivilant to the first"
-                ]
+                ],
                 "digests": {
                     "sha256": "..."
                 }
-            },
+            }
         }
     }
 }

@@ -31,28 +31,28 @@ pub enum ConfigError {
     NoTargetDirectoryFound,
 }
 
-#[derive(Deserialize, Debug)]
-struct Repository {
-    #[serde(rename = "url")]
-    _url: Url,
+#[derive(Deserialize, Debug, Clone)]
+pub(crate) struct Repository {
+    pub(crate) name: String,
+    pub(crate) url: Url,
 }
 
 impl FromStr for Repository {
     type Err = ConfigError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let name = s.to_string();
         let url = Url::from_str(s).map_err(|source| ConfigError::InvalidURL { source })?;
 
-        Ok(Repository { _url: url })
+        Ok(Repository { name, url })
     }
 }
 
 #[serde_with::serde_as]
 #[derive(Deserialize, Debug)]
 pub struct Config {
-    #[serde(rename = "repositories")]
     #[serde_as(as = "Vec<PickFirst<(_, DisplayFromStr)>>")]
-    _repositories: Vec<Repository>,
+    repositories: Vec<Repository>,
 }
 
 impl Config {
@@ -66,6 +66,10 @@ impl Config {
             .map_err(|source| ConfigError::InvalidConfig { source })?;
 
         Ok(config)
+    }
+
+    pub(crate) fn repositories(&self) -> &[Repository] {
+        &self.repositories
     }
 }
 

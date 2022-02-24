@@ -10,7 +10,7 @@ use clap::{Parser, Subcommand};
 use vfs::{PhysicalFS, VfsPath};
 
 use mqpkg::config::{find_config_dir, Config, CONFIG_FILENAME};
-use mqpkg::{MQPkg, PackageSpecifier};
+use mqpkg::{MQPkg, MQPkgError, PackageSpecifier, SolverError};
 
 #[derive(Parser, Debug)]
 #[clap(version)]
@@ -50,7 +50,18 @@ fn main() -> Result<()> {
         .with_context(|| format!("could not initialize in '{}'", root))?;
 
     match &cli.command {
-        Commands::Install { packages } => Ok(pkg.install(packages)?),
+        Commands::Install { packages } => match pkg.install(packages) {
+            Ok(v) => Ok(v),
+            Err(MQPkgError::ResolverError(SolverError::NoSolution(mut dt))) => {
+                dt.collapse_no_versions();
+                Err(SolverError::humanized(
+                    "unable to resolve packages to a set that satisfies all requirements",
+                    *dt,
+                )
+                .into())
+            }
+            Err(err) => Err(err.into()),
+        },
         _ => Err(anyhow!("command not implemented")),
     }
 }
