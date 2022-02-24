@@ -12,30 +12,17 @@ use std::str::FromStr;
 use pubgrub::version::Version as RVersion;
 use semver::{Version as SemanticVersion, VersionReq};
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use vfs::VfsPath;
 
+use crate::errors::{MQPkgError, PackageNameError, PackageSpecifierError, VersionError};
 use crate::pkgdb::transactions::transaction;
 
-pub use crate::resolver::SolverError;
-
 pub mod config;
+pub mod errors;
 
 mod pkgdb;
 mod repository;
 mod resolver;
-
-#[derive(Error, Debug)]
-pub enum PackageNameError {
-    #[error("names must have at least one character")]
-    TooShort,
-
-    #[error("names must begin with an alpha character")]
-    NoStartingAlpha { name: String, character: String },
-
-    #[error("names must contain only alphanumeric characters")]
-    InvalidCharacter { name: String, character: String },
-}
 
 #[derive(Serialize, Deserialize, Clone, Eq, Debug, Hash, PartialEq)]
 pub struct PackageName(String);
@@ -76,12 +63,6 @@ impl FromStr for PackageName {
     }
 }
 
-#[derive(Error, Debug)]
-pub enum VersionError {
-    #[error(transparent)]
-    ParseError(#[from] semver::Error),
-}
-
 #[derive(Deserialize, Debug, Clone, Ord, Eq, PartialEq, PartialOrd, Hash)]
 pub struct Version(SemanticVersion);
 
@@ -119,18 +100,6 @@ impl RVersion for Version {
     }
 }
 
-#[derive(Error, Debug)]
-pub enum PackageSpecifierError {
-    #[error("specifier must have a package name")]
-    NoPackageName,
-
-    #[error(transparent)]
-    InvalidPackageName(#[from] PackageNameError),
-
-    #[error(transparent)]
-    InvalidVersionRequirement(#[from] semver::Error),
-}
-
 #[derive(Serialize, Deserialize, Clone, Eq, Debug, Hash, PartialEq)]
 pub struct PackageSpecifier {
     name: PackageName,
@@ -151,21 +120,6 @@ impl FromStr for PackageSpecifier {
 
         Ok(PackageSpecifier { name, version })
     }
-}
-
-#[derive(Error, Debug)]
-pub enum MQPkgError {
-    #[error(transparent)]
-    DBError(#[from] pkgdb::DBError),
-
-    #[error(transparent)]
-    RepositoryError(#[from] repository::RepositoryError),
-
-    #[error(transparent)]
-    VersionError(#[from] VersionError),
-
-    #[error("error attempting to resolve dependencies")]
-    ResolverError(#[from] resolver::SolverError),
 }
 
 pub struct MQPkg {

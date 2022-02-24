@@ -10,23 +10,11 @@ use indexmap::IndexMap;
 use reqwest::blocking::Client as HTTPClient;
 use semver::VersionReq;
 use serde::Deserialize;
-use thiserror::Error;
 use url::Url;
 
 use crate::config;
+use crate::errors::RepositoryError;
 use crate::{PackageName, Version};
-
-#[derive(Error, Debug)]
-pub enum RepositoryError {
-    #[error(transparent)]
-    HTTPError(#[from] reqwest::Error),
-
-    #[error("could not parse JSON data")]
-    Deserialize(#[from] serde_json::Error),
-
-    #[error("could not access local file")]
-    IoError(#[from] std::io::Error),
-}
 
 #[derive(Deserialize, Debug)]
 struct MetaData {

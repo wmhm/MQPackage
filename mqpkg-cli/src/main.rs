@@ -10,7 +10,8 @@ use clap::{Parser, Subcommand};
 use vfs::{PhysicalFS, VfsPath};
 
 use mqpkg::config::{find_config_dir, Config, CONFIG_FILENAME};
-use mqpkg::{MQPkg, MQPkgError, PackageSpecifier, SolverError};
+use mqpkg::errors::{MQPkgError, SolverError};
+use mqpkg::{MQPkg, PackageSpecifier};
 
 #[derive(Parser, Debug)]
 #[clap(version)]

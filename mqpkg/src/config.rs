@@ -7,29 +7,12 @@ use std::str::FromStr;
 use camino::Utf8PathBuf;
 use serde::Deserialize;
 use serde_with::{serde_as, DisplayFromStr, PickFirst};
-use thiserror::Error;
 use url::Url;
 use vfs::VfsPath;
 
+use crate::errors::ConfigError;
+
 pub const CONFIG_FILENAME: &str = "mqpkg.yml";
-
-#[derive(Error, Debug)]
-pub enum ConfigError {
-    #[error("no configuration file")]
-    NoConfig { source: vfs::VfsError },
-
-    #[error("invalid configuration")]
-    InvalidConfig { source: serde_yaml::Error },
-
-    #[error("invalid url")]
-    InvalidURL { source: url::ParseError },
-
-    #[error("unable to traverse directory")]
-    DirectoryTraversalError { source: vfs::VfsError },
-
-    #[error("unable to locate a valid directory")]
-    NoTargetDirectoryFound,
-}
 
 #[derive(Deserialize, Debug, Clone)]
 pub(crate) struct Repository {

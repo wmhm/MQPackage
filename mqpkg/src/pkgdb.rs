@@ -8,9 +8,9 @@ use std::mem::drop;
 
 use semver::VersionReq;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use vfs::VfsPath;
 
+use crate::errors::DBError;
 use crate::pkgdb::transactions::{Transaction, TransactionManager};
 use crate::{PackageName, PackageSpecifier};
 
@@ -18,21 +18,6 @@ pub mod transactions;
 
 const PKGDB_DIR: &str = "pkgdb";
 const STATE_FILE: &str = "state.yml";
-
-#[derive(Error, Debug)]
-pub enum DBError {
-    #[error("could not access the pkgdb")]
-    PathUnavailable(#[from] vfs::VfsError),
-
-    #[error("could not parse state.yml")]
-    InvalidState { source: serde_yaml::Error },
-
-    #[error("could not initiate transaction")]
-    TransactionError(#[from] transactions::TransactionError),
-
-    #[error("no transaction")]
-    NoTransaction,
-}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct PackageRequest {

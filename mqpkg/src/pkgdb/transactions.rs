@@ -3,7 +3,8 @@
 // for complete details.
 
 use named_lock::{Error as NLError, NamedLock, NamedLockGuard};
-use thiserror::Error;
+
+use crate::errors::TransactionError;
 
 macro_rules! transaction {
     ($db:expr, $body:block) => {{
@@ -22,12 +23,6 @@ macro_rules! transaction {
 }
 
 pub(crate) use transaction;
-
-#[derive(Error, Debug)]
-pub enum TransactionError {
-    #[error(transparent)]
-    LockError(#[from] named_lock::Error),
-}
 
 #[derive(Debug)]
 pub(crate) struct TransactionManager {
