@@ -35,7 +35,7 @@ struct Release {
 }
 
 #[derive(Deserialize, Debug)]
-pub(super) struct RepoData {
+struct RepoData {
     #[serde(rename = "meta")]
     _meta: MetaData,
     packages: HashMap<PackageName, HashMap<Version, Release>>,

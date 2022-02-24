@@ -57,14 +57,14 @@ impl State {
     }
 }
 
-pub struct Database {
+pub(crate) struct Database {
     id: String,
     fs: VfsPath,
     state: Option<State>,
 }
 
 impl Database {
-    pub fn new(fs: VfsPath, id: String) -> Result<Database> {
+    pub(crate) fn new(fs: VfsPath, id: String) -> Result<Database> {
         Ok(Database {
             id,
             fs,
