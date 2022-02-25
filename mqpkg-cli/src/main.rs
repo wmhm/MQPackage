@@ -82,6 +82,13 @@ fn main() -> Result<()> {
             b.push(bar.downgrade());
             bar
         });
+        pkg.with_progress_spinner(|msg| {
+            let mut b = bars.lock().unwrap();
+            let bar = ProgressBar::new_spinner();
+            bar.set_message(msg);
+            b.push(bar.downgrade());
+            bar
+        });
         pkg.with_progress_update(|bar, delta| bar.inc(delta));
         pkg.with_progress_finish(|bar| bar.finish_and_clear());
     }

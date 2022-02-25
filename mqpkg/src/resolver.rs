@@ -102,7 +102,11 @@ impl<'p, T> Solver<'p, T> {
         Solver { repository }
     }
 
-    pub(crate) fn resolve(&self, reqs: RequestedPackages) -> Result<SolverSolution, SolverError> {
+    pub(crate) fn resolve(
+        &self,
+        reqs: RequestedPackages,
+        callback: impl Fn(),
+    ) -> Result<SolverSolution, SolverError> {
         let package = PackageName::new(ROOT_NAME);
         let version = Version::new(ROOT_VER.0, ROOT_VER.1, ROOT_VER.2);
 
@@ -110,6 +114,7 @@ impl<'p, T> Solver<'p, T> {
             repository: &self.repository,
             root: package.clone(),
             requested: reqs,
+            callback: Box::new(callback),
         };
 
         info!(target: LOGNAME, "resolving requested packages");
@@ -124,13 +129,19 @@ impl<'p, T> Solver<'p, T> {
 // to persist between runs will only live on the InternalSolver. Anything we want
 // to persist long term, lives on the Solver and gets passed into InternalSolver
 // as a reference.
-struct InternalSolver<'r, 'p, T> {
+struct InternalSolver<'r, 'c, 'p, T> {
     repository: &'r Repository<'p, T>,
     root: PackageName,
     requested: RequestedPackages,
+    callback: Box<dyn Fn() + 'c>,
 }
 
-impl<'r, 'p, T> DependencyProvider<PackageName, Version> for InternalSolver<'r, 'p, T> {
+impl<'r, 'c, 'p, T> DependencyProvider<PackageName, Version> for InternalSolver<'r, 'c, 'p, T> {
+    fn should_cancel(&self) -> Result<(), Box<dyn std::error::Error>> {
+        (self.callback)();
+        Ok(())
+    }
+
     fn choose_package_version<P: Borrow<PackageName>, U: Borrow<Range<Version>>>(
         &self,
         potential_packages: impl Iterator<Item = (P, U)>,

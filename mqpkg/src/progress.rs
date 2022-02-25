@@ -6,7 +6,8 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 
 struct ProgressInternal<'p, T> {
-    start: Option<Box<dyn FnMut(u64) -> T + 'p>>,
+    spinner: Option<Box<dyn FnMut(&'static str) -> T + 'p>>,
+    bar: Option<Box<dyn FnMut(u64) -> T + 'p>>,
     update: Option<Box<dyn FnMut(&T, u64) + 'p>>,
     finish: Option<Box<dyn FnMut(&T) + 'p>>,
 }
@@ -18,8 +19,12 @@ impl<'p, T> fmt::Debug for ProgressInternal<'p, T> {
 }
 
 impl<'p, T> ProgressInternal<'p, T> {
-    fn start(&mut self, len: u64) -> Option<T> {
-        self.start.as_mut().map(|cb| (cb)(len))
+    fn bar(&mut self, len: u64) -> Option<T> {
+        self.bar.as_mut().map(|cb| (cb)(len))
+    }
+
+    fn spinner(&mut self, msg: &'static str) -> Option<T> {
+        self.spinner.as_mut().map(|cb| (cb)(msg))
     }
 
     fn update(&mut self, bar: &T, delta: u64) {
@@ -52,16 +57,22 @@ impl<'p, T> Progress<'p, T> {
     pub(crate) fn new() -> Progress<'p, T> {
         Progress {
             internal: Arc::new(Mutex::new(ProgressInternal {
-                start: None,
+                bar: None,
                 update: None,
                 finish: None,
+                spinner: None,
             })),
         }
     }
 
     pub(crate) fn with_progress_start(&mut self, cb: impl FnMut(u64) -> T + 'p) {
         let mut internal = self.internal.lock().unwrap();
-        internal.start = Some(Box::new(cb))
+        internal.bar = Some(Box::new(cb))
+    }
+
+    pub(crate) fn with_progress_spinner(&mut self, cb: impl FnMut(&'static str) -> T + 'p) {
+        let mut internal = self.internal.lock().unwrap();
+        internal.spinner = Some(Box::new(cb))
     }
 
     pub(crate) fn with_progress_update(&mut self, cb: impl FnMut(&T, u64) + 'p) {
@@ -79,6 +90,10 @@ impl<'p, T> Progress<'p, T> {
     pub(crate) fn bar(&self, len: u64) -> ProgressBar<'p, T> {
         ProgressBar::new(self.internal.clone(), len)
     }
+
+    pub(crate) fn spinner(&self, msg: &'static str) -> ProgressBar<'p, T> {
+        ProgressBar::new_spinner(self.internal.clone(), msg)
+    }
 }
 
 pub(crate) struct ProgressBar<'p, T> {
@@ -89,7 +104,19 @@ pub(crate) struct ProgressBar<'p, T> {
 impl<'p, T> ProgressBar<'p, T> {
     fn new(internal: Arc<Mutex<ProgressInternal<'p, T>>>, len: u64) -> ProgressBar<'p, T> {
         let mut lock = internal.lock().unwrap();
-        let bar = lock.start(len).map(Box::new);
+        let bar = lock.bar(len).map(Box::new);
+
+        drop(lock);
+
+        ProgressBar { internal, bar }
+    }
+
+    fn new_spinner(
+        internal: Arc<Mutex<ProgressInternal<'p, T>>>,
+        msg: &'static str,
+    ) -> ProgressBar<'p, T> {
+        let mut lock = internal.lock().unwrap();
+        let bar = lock.spinner(msg).map(Box::new);
 
         drop(lock);
 

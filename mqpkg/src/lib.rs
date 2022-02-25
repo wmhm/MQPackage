@@ -50,6 +50,10 @@ impl<'p, T> Installer<'p, T> {
         self.progress.with_progress_start(Box::new(cb))
     }
 
+    pub fn with_progress_spinner(&mut self, cb: impl FnMut(&'static str) -> T + 'p) {
+        self.progress.with_progress_spinner(Box::new(cb))
+    }
+
     pub fn with_progress_update(&mut self, cb: impl FnMut(&T, u64) + 'p) {
         self.progress.with_progress_update(Box::new(cb))
     }
@@ -88,7 +92,10 @@ impl<'p, T> Installer<'p, T> {
         let repository = repository::Repository::new(self.progress.clone())?
             .fetch(self.config.repositories())?;
         let solver = resolver::Solver::new(repository);
-        let solution = solver.resolve(requested)?;
+        let spinner = self.progress.spinner("Resolving dependencies");
+        let solution = solver.resolve(requested, || spinner.update(1))?;
+
+        spinner.finish();
 
         Ok(solution)
     }
