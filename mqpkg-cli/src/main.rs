@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex};
 use anyhow::{anyhow, Context, Result};
 use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
+use clap_verbosity_flag::{LogLevel as BaseLogLevel, Verbosity};
 use indicatif::ProgressBar;
 use vfs::{PhysicalFS, VfsPath};
 
@@ -15,9 +16,21 @@ use mqpkg::{Config, Installer, InstallerError, PackageSpecifier, SolverError};
 
 mod logging;
 
-#[derive(Parser, Debug)]
+#[derive(Debug)]
+struct LogLevel;
+
+impl BaseLogLevel for LogLevel {
+    fn default() -> Option<log::Level> {
+        Some(log::Level::Info)
+    }
+}
+
+#[derive(Debug, Parser)]
 #[clap(version)]
 struct Cli {
+    #[clap(flatten)]
+    verbose: Verbosity<LogLevel>,
+
     #[clap(global = true, short, long)]
     target: Option<Utf8PathBuf>,
 
@@ -25,7 +38,7 @@ struct Cli {
     command: Commands,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Debug, Subcommand)]
 enum Commands {
     Install {
         #[clap(required = true)]
@@ -41,7 +54,9 @@ fn main() -> Result<()> {
 
     // Setup our logging.
     let bars = Arc::new(Mutex::new(Vec::new()));
-    logging::setup(bars.clone());
+    let render_bars = cli.verbose.log_level().or(Some(log::Level::Error)).unwrap()
+        >= LogLevel::default().unwrap();
+    logging::setup(cli.verbose.log_level_filter(), bars.clone());
 
     // Build our VFS, Config, and Installer objects, and a HashMap to hold our
     // progress bars.
@@ -61,14 +76,16 @@ fn main() -> Result<()> {
         .with_context(|| format!("could not initialize in '{}'", root))?;
 
     // Setup our progress callbacks.
-    pkg.with_progress_start(|len| {
-        let mut b = bars.lock().unwrap();
-        let bar = ProgressBar::new(len);
-        b.push(bar.downgrade());
-        bar
-    });
-    pkg.with_progress_update(|bar, delta| bar.inc(delta));
-    pkg.with_progress_finish(|bar| bar.finish_and_clear());
+    if render_bars {
+        pkg.with_progress_start(|len| {
+            let mut b = bars.lock().unwrap();
+            let bar = ProgressBar::new(len);
+            b.push(bar.downgrade());
+            bar
+        });
+        pkg.with_progress_update(|bar, delta| bar.inc(delta));
+        pkg.with_progress_finish(|bar| bar.finish_and_clear());
+    }
 
     // Actually dispatch to our commands.
     match &cli.command {

@@ -5,7 +5,7 @@
 use std::sync::{Arc, Mutex};
 
 use indicatif::WeakProgressBar;
-use log::{Metadata, Record};
+use log::{LevelFilter, Metadata, Record};
 use pretty_env_logger::env_logger::Logger;
 
 struct IndicatifAwareLogger {
@@ -62,10 +62,10 @@ impl log::Log for IndicatifAwareLogger {
     fn flush(&self) {}
 }
 
-pub(crate) fn setup(bars: Arc<Mutex<Vec<WeakProgressBar>>>) {
+pub(crate) fn setup(level: LevelFilter, bars: Arc<Mutex<Vec<WeakProgressBar>>>) {
     let logger = IndicatifAwareLogger::new(
         pretty_env_logger::formatted_builder()
-            .filter_level(log::LevelFilter::Trace)
+            .filter_level(level)
             .build(),
         bars,
     );
