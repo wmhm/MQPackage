@@ -8,20 +8,17 @@ use indicatif::WeakProgressBar;
 use log::{Metadata, Record};
 use pretty_env_logger::env_logger::Logger;
 
-pub(crate) struct IndicatifAwareLogger {
+struct IndicatifAwareLogger {
     internal: Logger,
     bars: Arc<Mutex<Vec<WeakProgressBar>>>,
 }
 
 impl IndicatifAwareLogger {
-    pub(crate) fn new(
-        internal: Logger,
-        bars: Arc<Mutex<Vec<WeakProgressBar>>>,
-    ) -> IndicatifAwareLogger {
+    fn new(internal: Logger, bars: Arc<Mutex<Vec<WeakProgressBar>>>) -> IndicatifAwareLogger {
         IndicatifAwareLogger { internal, bars }
     }
 
-    pub(crate) fn install(self) {
+    fn install(self) {
         let max_level = self.internal.filter();
 
         log::set_boxed_logger(Box::new(self)).unwrap();
@@ -63,4 +60,15 @@ impl log::Log for IndicatifAwareLogger {
     }
 
     fn flush(&self) {}
+}
+
+pub(crate) fn setup(bars: Arc<Mutex<Vec<WeakProgressBar>>>) {
+    let logger = IndicatifAwareLogger::new(
+        pretty_env_logger::formatted_builder()
+            .filter_level(log::LevelFilter::Trace)
+            .build(),
+        bars,
+    );
+
+    logger.install();
 }

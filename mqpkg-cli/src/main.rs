@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use anyhow::{anyhow, Context, Result};
 use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
-use indicatif::{ProgressBar, WeakProgressBar};
+use indicatif::ProgressBar;
 use vfs::{PhysicalFS, VfsPath};
 
 use mqpkg::{Config, Installer, InstallerError, PackageSpecifier, SolverError};
@@ -35,23 +35,16 @@ enum Commands {
     Upgrade {},
 }
 
-fn setup_logging(bars: Arc<Mutex<Vec<WeakProgressBar>>>) {
-    let logger = logging::IndicatifAwareLogger::new(
-        pretty_env_logger::formatted_builder()
-            .filter_level(log::LevelFilter::Trace)
-            .build(),
-        bars,
-    );
-
-    logger.install();
-}
-
 fn main() -> Result<()> {
-    let bars = Arc::new(Mutex::new(Vec::new()));
-    setup_logging(bars.clone());
-
     // Parse our CLI parameters.
     let cli = Cli::parse();
+
+    // Setup our logging.
+    let bars = Arc::new(Mutex::new(Vec::new()));
+    logging::setup(bars.clone());
+
+    // Build our VFS, Config, and Installer objects, and a HashMap to hold our
+    // progress bars.
     let root = match cli.target {
         Some(target) => canonicalize(target)?,
         None => Config::find(current_dir()?).with_context(|| {
@@ -61,9 +54,6 @@ fn main() -> Result<()> {
             )
         })?,
     };
-
-    // Build our VFS, Config, and Installer objects, and a HashMap to hold our
-    // progress bars.
     let fs: VfsPath = PhysicalFS::new(PathBuf::from(&root)).into();
     let config =
         Config::load(&fs).with_context(|| format!("invalid target directory '{}'", root))?;
