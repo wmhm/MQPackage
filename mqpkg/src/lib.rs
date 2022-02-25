@@ -26,14 +26,14 @@ mod resolver;
 
 type Result<T, E = InstallerError> = core::result::Result<T, E>;
 
-pub struct Installer<'p> {
+pub struct Installer<'p, T> {
     config: config::Config,
     db: pkgdb::Database,
-    progress: Progress<'p>,
+    progress: Progress<'p, T>,
 }
 
-impl<'p> Installer<'p> {
-    pub fn new(config: config::Config, fs: VfsPath, rid: &str) -> Result<Installer> {
+impl<'p, T> Installer<'p, T> {
+    pub fn new(config: config::Config, fs: VfsPath, rid: &str) -> Result<Installer<T>> {
         // We're using MD5 here because it's short and fast, we're not using
         // this in a security sensitive aspect.
         let id = format!("{:x}", md5::compute(rid));
@@ -46,20 +46,20 @@ impl<'p> Installer<'p> {
         })
     }
 
-    pub fn with_progress_start(&mut self, cb: impl FnMut(&str, u64) + 'p) {
+    pub fn with_progress_start(&mut self, cb: impl FnMut(u64) -> T + 'p) {
         self.progress.with_progress_start(Box::new(cb))
     }
 
-    pub fn with_progress_update(&mut self, cb: impl FnMut(&str, u64) + 'p) {
+    pub fn with_progress_update(&mut self, cb: impl FnMut(&T, u64) + 'p) {
         self.progress.with_progress_update(Box::new(cb))
     }
 
-    pub fn with_progress_finish(&mut self, cb: impl FnMut(&str) + 'p) {
+    pub fn with_progress_finish(&mut self, cb: impl FnMut(&T) + 'p) {
         self.progress.with_progress_finish(Box::new(cb))
     }
 }
 
-impl<'p> Installer<'p> {
+impl<'p, T> Installer<'p, T> {
     pub fn install(&mut self, packages: &[PackageSpecifier]) -> Result<()> {
         transaction!(self.db, {
             // Add all of the packages being requested to the set of all requested packages.
@@ -75,7 +75,7 @@ impl<'p> Installer<'p> {
                 requested.insert(req.name.clone(), req.version.clone());
             }
 
-            let bar = self.progress.bar("test", 30);
+            let bar = self.progress.bar(30);
             for _ in 0..30 {
                 std::thread::sleep(std::time::Duration::from_millis(250));
                 // info!(target: "mqpkg", "test");
@@ -91,7 +91,7 @@ impl<'p> Installer<'p> {
     }
 }
 
-impl<'p> Installer<'p> {
+impl<'p, T> Installer<'p, T> {
     fn resolve(&self, requested: RequestedPackages) -> Result<SolverSolution> {
         let repository = repository::Repository::new()?.fetch(self.config.repositories())?;
         let solver = resolver::Solver::new(repository);
