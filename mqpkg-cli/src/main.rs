@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use anyhow::{anyhow, Context, Result};
 use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
-use clap_verbosity_flag::{LogLevel as BaseLogLevel, Verbosity};
+use clap_verbosity_flag::{Verbosity, WarnLevel};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::info;
 use vfs::{PhysicalFS, VfsPath};
@@ -19,20 +19,11 @@ mod logging;
 
 const LOGNAME: &str = "mqpkg";
 
-#[derive(Debug)]
-struct LogLevel;
-
-impl BaseLogLevel for LogLevel {
-    fn default() -> Option<log::Level> {
-        Some(log::Level::Info)
-    }
-}
-
 #[derive(Debug, Parser)]
 #[clap(version)]
 struct Cli {
     #[clap(flatten)]
-    verbose: Verbosity<LogLevel>,
+    verbose: Verbosity<WarnLevel>,
 
     #[clap(global = true, short, long)]
     target: Option<Utf8PathBuf>,
@@ -60,8 +51,8 @@ fn main() -> Result<()> {
     let bars = Arc::new(Mutex::new(Vec::new()));
 
     // Setup our logging.
-    let render_bars = cli.verbose.log_level().or(Some(log::Level::Error)).unwrap()
-        >= LogLevel::default().unwrap();
+    let render_bars =
+        cli.verbose.log_level().or(Some(log::Level::Error)).unwrap() >= log::Level::Warn;
     logging::setup(cli.verbose.log_level_filter(), bars.clone());
 
     // Build our VFS, Config, and Installer objects, and a HashMap to hold our
