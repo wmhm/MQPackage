@@ -3,7 +3,6 @@
 // for complete details.
 
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
 
 use anyhow::{anyhow, Context, Result};
 use camino::Utf8PathBuf;
@@ -15,6 +14,10 @@ use log::info;
 use vfs::{PhysicalFS, VfsPath};
 
 use mqpkg::{Config, Installer, InstallerError, PackageSpecifier, SolverError};
+
+use crate::progress::SuspendableBars;
+
+pub(crate) mod progress;
 
 mod logging;
 
@@ -49,8 +52,8 @@ fn main() -> Result<()> {
 
     // Setup a few items for our console and progress bar handling
     let term = Term::stdout();
+    let bars = SuspendableBars::new();
     let style = ProgressStyle::default_bar().progress_chars("█▇▆▅▄▃▂▁  ");
-    let bars = Arc::new(Mutex::new(Vec::new()));
 
     // Setup our logging.
     let render_bars =
@@ -85,18 +88,10 @@ fn main() -> Result<()> {
     // Setup our progress callbacks.
     if render_bars {
         pkg.with_progress_start(|len| {
-            let mut b = bars.lock().unwrap();
-            let bar = ProgressBar::new(len);
-            bar.set_style(style.clone());
-            b.push(bar.downgrade());
-            bar
+            bars.with_bar(ProgressBar::new(len).with_style(style.clone()))
         });
         pkg.with_progress_spinner(|msg| {
-            let mut b = bars.lock().unwrap();
-            let bar = ProgressBar::new_spinner();
-            bar.set_message(msg);
-            b.push(bar.downgrade());
-            bar
+            bars.with_bar(ProgressBar::new_spinner().with_message(msg))
         });
         pkg.with_progress_update(|bar, delta| bar.inc(delta));
         pkg.with_progress_finish(|bar| bar.finish_and_clear());

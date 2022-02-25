@@ -2,19 +2,18 @@
 // 2.0, and the BSD License. See the LICENSE file in the root of this repository
 // for complete details.
 
-use std::sync::{Arc, Mutex};
-
-use indicatif::WeakProgressBar;
 use log::{LevelFilter, Metadata, Record};
 use pretty_env_logger::env_logger::Logger;
 
+use crate::progress::SuspendableBars;
+
 struct IndicatifAwareLogger {
     internal: Logger,
-    bars: Arc<Mutex<Vec<WeakProgressBar>>>,
+    bars: SuspendableBars,
 }
 
 impl IndicatifAwareLogger {
-    fn new(internal: Logger, bars: Arc<Mutex<Vec<WeakProgressBar>>>) -> IndicatifAwareLogger {
+    fn new(internal: Logger, bars: SuspendableBars) -> IndicatifAwareLogger {
         IndicatifAwareLogger { internal, bars }
     }
 
@@ -24,30 +23,6 @@ impl IndicatifAwareLogger {
         log::set_boxed_logger(Box::new(self)).unwrap();
         log::set_max_level(max_level);
     }
-
-    fn suspended(&self, callback: impl FnOnce()) {
-        let mut bs = self.bars.lock().unwrap();
-        bs.retain(|b| b.upgrade().is_some());
-
-        let mut ibar = bs.iter().filter(|bar| match bar.upgrade() {
-            Some(b) => !b.is_finished(),
-            None => false,
-        });
-        let wbar = ibar.next();
-
-        match wbar {
-            Some(wbar) => {
-                let nbars = ibar.count();
-                assert!(nbars == 0, "too many active bars");
-
-                match wbar.upgrade() {
-                    Some(bar) => bar.suspend(callback),
-                    None => (callback)(),
-                }
-            }
-            None => (callback)(),
-        }
-    }
 }
 
 impl log::Log for IndicatifAwareLogger {
@@ -56,13 +31,13 @@ impl log::Log for IndicatifAwareLogger {
     }
 
     fn log(&self, record: &Record) {
-        self.suspended(|| self.internal.log(record))
+        self.bars.suspended(|| self.internal.log(record))
     }
 
     fn flush(&self) {}
 }
 
-pub(crate) fn setup(level: LevelFilter, bars: Arc<Mutex<Vec<WeakProgressBar>>>) {
+pub(crate) fn setup(level: LevelFilter, bars: SuspendableBars) {
     let logger = IndicatifAwareLogger::new(
         pretty_env_logger::formatted_builder()
             .filter_level(level)
