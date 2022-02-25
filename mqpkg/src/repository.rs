@@ -15,7 +15,6 @@ use url::Url;
 
 use crate::config;
 use crate::errors::RepositoryError;
-use crate::progress::Progress;
 use crate::types::{PackageName, Version};
 
 const LOGNAME: &str = "mqpkg::repository";
@@ -46,27 +45,25 @@ struct RepoData {
 }
 
 #[derive(Debug)]
-pub(crate) struct Repository<'p, T> {
-    progress: Progress<'p, T>,
+pub(crate) struct Repository {
     client: HTTPClient,
     data: IndexMap<String, RepoData>,
 }
 
-impl<'p, T> Repository<'p, T> {
-    pub(crate) fn new(progress: Progress<'p, T>) -> Result<Repository<'p, T>> {
+impl Repository {
+    pub(crate) fn new() -> Result<Repository> {
         let client = HTTPClient::builder().gzip(true).build()?;
         let data = IndexMap::<String, RepoData>::new();
 
-        Ok(Repository {
-            client,
-            data,
-            progress,
-        })
+        Ok(Repository { client, data })
     }
 
-    pub(crate) fn fetch(mut self, repos: &[config::Repository]) -> Result<Repository<'p, T>> {
+    pub(crate) fn fetch(
+        mut self,
+        repos: &[config::Repository],
+        callback: impl Fn(),
+    ) -> Result<Repository> {
         info!(target: LOGNAME, "fetching package metadata");
-        let bar = self.progress.bar(repos.len().try_into().unwrap());
         for repo in repos.iter() {
             let data: RepoData = match repo.url.scheme() {
                 "file" => {
@@ -83,9 +80,8 @@ impl<'p, T> Repository<'p, T> {
                     .json()?,
             };
             self.data.insert(repo.name.clone(), data);
-            bar.update(1);
+            (callback)();
         }
-        bar.finish();
 
         Ok(self)
     }

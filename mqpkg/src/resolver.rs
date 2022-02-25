@@ -93,12 +93,12 @@ impl std::error::Error for HumanizedNoSolutionError {
     }
 }
 
-pub(crate) struct Solver<'p, T> {
-    repository: Repository<'p, T>,
+pub(crate) struct Solver {
+    repository: Repository,
 }
 
-impl<'p, T> Solver<'p, T> {
-    pub(crate) fn new(repository: Repository<'p, T>) -> Solver<'p, T> {
+impl Solver {
+    pub(crate) fn new(repository: Repository) -> Solver {
         Solver { repository }
     }
 
@@ -129,14 +129,14 @@ impl<'p, T> Solver<'p, T> {
 // to persist between runs will only live on the InternalSolver. Anything we want
 // to persist long term, lives on the Solver and gets passed into InternalSolver
 // as a reference.
-struct InternalSolver<'r, 'c, 'p, T> {
-    repository: &'r Repository<'p, T>,
+struct InternalSolver<'r, 'c> {
+    repository: &'r Repository,
     root: PackageName,
     requested: RequestedPackages,
     callback: Box<dyn Fn() + 'c>,
 }
 
-impl<'r, 'c, 'p, T> DependencyProvider<PackageName, Version> for InternalSolver<'r, 'c, 'p, T> {
+impl<'r, 'c> DependencyProvider<PackageName, Version> for InternalSolver<'r, 'c> {
     fn should_cancel(&self) -> Result<(), Box<dyn std::error::Error>> {
         (self.callback)();
         Ok(())
