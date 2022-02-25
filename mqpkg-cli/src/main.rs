@@ -10,11 +10,14 @@ use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
 use clap_verbosity_flag::{LogLevel as BaseLogLevel, Verbosity};
 use indicatif::{ProgressBar, ProgressStyle};
+use log::info;
 use vfs::{PhysicalFS, VfsPath};
 
 use mqpkg::{Config, Installer, InstallerError, PackageSpecifier, SolverError};
 
 mod logging;
+
+const LOGNAME: &str = "mqpkg";
 
 #[derive(Debug)]
 struct LogLevel;
@@ -72,6 +75,7 @@ fn main() -> Result<()> {
             )
         })?,
     };
+    info!(target: LOGNAME, "using root directory: '{}'", root);
     let fs: VfsPath = PhysicalFS::new(PathBuf::from(&root)).into();
     let config =
         Config::load(&fs).with_context(|| format!("invalid target directory '{}'", root))?;

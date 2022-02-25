@@ -18,6 +18,8 @@ use crate::errors::RepositoryError;
 use crate::progress::Progress;
 use crate::types::{PackageName, Version};
 
+const LOGNAME: &str = "mqpkg::repository";
+
 type Result<T, E = RepositoryError> = core::result::Result<T, E>;
 
 #[derive(Deserialize, Debug)]
@@ -63,7 +65,7 @@ impl<'p, T> Repository<'p, T> {
     }
 
     pub(crate) fn fetch(mut self, repos: &[config::Repository]) -> Result<Repository<'p, T>> {
-        info!(target: "mqpkg::repository::fetch", "Fetching package metadata");
+        info!(target: LOGNAME, "fetching package metadata");
         let bar = self.progress.bar(repos.len().try_into().unwrap());
         for repo in repos.iter() {
             let data: RepoData = match repo.url.scheme() {

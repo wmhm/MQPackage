@@ -5,12 +5,15 @@
 use std::str::FromStr;
 
 use camino::Utf8PathBuf;
+use log::info;
 use serde::Deserialize;
 use serde_with::{serde_as, DisplayFromStr, PickFirst};
 use url::Url;
 use vfs::VfsPath;
 
 use crate::errors::ConfigError;
+
+const LOGNAME: &str = "mqpkg::config";
 
 const CONFIG_FILENAME: &str = "mqpkg.yml";
 
@@ -46,9 +49,15 @@ impl Config {
     }
 
     pub fn load(root: &VfsPath) -> Result<Config> {
-        let file = root
+        let filename = root
             .join(CONFIG_FILENAME)
-            .map_err(|source| ConfigError::NoConfig { source })?
+            .map_err(|source| ConfigError::NoConfig { source })?;
+        info!(
+            target: LOGNAME,
+            "loading config from {:?}",
+            filename.as_str()
+        );
+        let file = filename
             .open_file()
             .map_err(|source| ConfigError::NoConfig { source })?;
         let config: Config = serde_yaml::from_reader(file)
