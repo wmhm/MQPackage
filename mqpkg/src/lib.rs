@@ -30,6 +30,7 @@ pub struct Installer<'p, T> {
     config: config::Config,
     db: pkgdb::Database,
     progress: Progress<'p, T>,
+    console: Option<Box<dyn Fn(&str) + 'p>>,
 }
 
 impl<'p, T> Installer<'p, T> {
@@ -43,7 +44,12 @@ impl<'p, T> Installer<'p, T> {
             config,
             db,
             progress: Progress::new(),
+            console: None,
         })
+    }
+
+    pub fn with_console(&mut self, cb: impl Fn(&str) + 'p) {
+        self.console = Some(Box::new(cb))
     }
 
     pub fn with_progress_start(&mut self, cb: impl FnMut(u64) -> T + 'p) {
@@ -88,6 +94,12 @@ impl<'p, T> Installer<'p, T> {
 }
 
 impl<'p, T> Installer<'p, T> {
+    fn console(&self, msg: &str) {
+        if let Some(cb) = &self.console {
+            (cb)(msg);
+        }
+    }
+
     fn resolve(&self, requested: RequestedPackages) -> Result<SolverSolution> {
         let bar = self
             .progress

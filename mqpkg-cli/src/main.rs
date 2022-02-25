@@ -9,6 +9,7 @@ use anyhow::{anyhow, Context, Result};
 use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
 use clap_verbosity_flag::{Verbosity, WarnLevel};
+use console::Term;
 use indicatif::{ProgressBar, ProgressStyle};
 use log::info;
 use vfs::{PhysicalFS, VfsPath};
@@ -46,7 +47,8 @@ fn main() -> Result<()> {
     // Parse our CLI parameters.
     let cli = Cli::parse();
 
-    // Setup a few items for our progress bar handling
+    // Setup a few items for our console and progress bar handling
+    let term = Term::stdout();
     let style = ProgressStyle::default_bar().progress_chars("█▇▆▅▄▃▂▁  ");
     let bars = Arc::new(Mutex::new(Vec::new()));
 
@@ -72,6 +74,13 @@ fn main() -> Result<()> {
         Config::load(&fs).with_context(|| format!("invalid target directory '{}'", root))?;
     let mut pkg = Installer::new(config, fs, root.as_str())
         .with_context(|| format!("could not initialize in '{}'", root))?;
+
+    // Setup our console callback
+    if !cli.verbose.is_silent() {
+        pkg.with_console(|msg| {
+            term.write_line(msg).ok();
+        });
+    }
 
     // Setup our progress callbacks.
     if render_bars {
