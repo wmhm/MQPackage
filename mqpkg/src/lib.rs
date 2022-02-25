@@ -15,12 +15,12 @@ pub use crate::config::Config;
 pub use crate::errors::{InstallerError, SolverError};
 pub use crate::types::PackageSpecifier;
 
+pub(crate) mod progress;
 pub(crate) mod types;
 
 mod config;
 mod errors;
 mod pkgdb;
-mod progress;
 mod repository;
 mod resolver;
 
@@ -85,7 +85,8 @@ impl<'p, T> Installer<'p, T> {
 
 impl<'p, T> Installer<'p, T> {
     fn resolve(&self, requested: RequestedPackages) -> Result<SolverSolution> {
-        let repository = repository::Repository::new()?.fetch(self.config.repositories())?;
+        let repository = repository::Repository::new(self.progress.clone())?
+            .fetch(self.config.repositories())?;
         let solver = resolver::Solver::new(repository);
         let solution = solver.resolve(requested)?;
 

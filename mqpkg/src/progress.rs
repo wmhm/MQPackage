@@ -2,12 +2,19 @@
 // 2.0, and the BSD License. See the LICENSE file in the root of this repository
 // for complete details.
 
+use std::fmt;
 use std::sync::{Arc, Mutex};
 
 struct ProgressInternal<'p, T> {
     start: Option<Box<dyn FnMut(u64) -> T + 'p>>,
     update: Option<Box<dyn FnMut(&T, u64) + 'p>>,
     finish: Option<Box<dyn FnMut(&T) + 'p>>,
+}
+
+impl<'p, T> fmt::Debug for ProgressInternal<'p, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ProgressInternal").finish()
+    }
 }
 
 impl<'p, T> ProgressInternal<'p, T> {
@@ -28,8 +35,17 @@ impl<'p, T> ProgressInternal<'p, T> {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct Progress<'p, T> {
     internal: Arc<Mutex<ProgressInternal<'p, T>>>,
+}
+
+impl<'p, T> Clone for Progress<'p, T> {
+    fn clone(&self) -> Self {
+        Progress {
+            internal: self.internal.clone(),
+        }
+    }
 }
 
 impl<'p, T> Progress<'p, T> {

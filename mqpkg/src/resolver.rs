@@ -90,12 +90,12 @@ impl std::error::Error for HumanizedNoSolutionError {
     }
 }
 
-pub(crate) struct Solver {
-    repository: Repository,
+pub(crate) struct Solver<'p, T> {
+    repository: Repository<'p, T>,
 }
 
-impl Solver {
-    pub(crate) fn new(repository: Repository) -> Solver {
+impl<'p, T> Solver<'p, T> {
+    pub(crate) fn new(repository: Repository<'p, T>) -> Solver<'p, T> {
         Solver { repository }
     }
 
@@ -119,17 +119,17 @@ impl Solver {
 // to persist between runs will only live on the InternalSolver. Anything we want
 // to persist long term, lives on the Solver and gets passed into InternalSolver
 // as a reference.
-struct InternalSolver<'r> {
-    repository: &'r Repository,
+struct InternalSolver<'r, 'p, T> {
+    repository: &'r Repository<'p, T>,
     root: PackageName,
     requested: RequestedPackages,
 }
 
-impl<'r> DependencyProvider<PackageName, Version> for InternalSolver<'r> {
-    fn choose_package_version<T: Borrow<PackageName>, U: Borrow<Range<Version>>>(
+impl<'r, 'p, T> DependencyProvider<PackageName, Version> for InternalSolver<'r, 'p, T> {
+    fn choose_package_version<P: Borrow<PackageName>, U: Borrow<Range<Version>>>(
         &self,
-        potential_packages: impl Iterator<Item = (T, U)>,
-    ) -> Result<(T, Option<Version>), Box<dyn std::error::Error>> {
+        potential_packages: impl Iterator<Item = (P, U)>,
+    ) -> Result<(P, Option<Version>), Box<dyn std::error::Error>> {
         Ok(choose_package_with_fewest_versions(
             |package| {
                 if package == &self.root {

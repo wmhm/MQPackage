@@ -14,6 +14,7 @@ use url::Url;
 
 use crate::config;
 use crate::errors::RepositoryError;
+use crate::progress::Progress;
 use crate::types::{PackageName, Version};
 
 type Result<T, E = RepositoryError> = core::result::Result<T, E>;
@@ -42,20 +43,26 @@ struct RepoData {
 }
 
 #[derive(Debug)]
-pub(crate) struct Repository {
+pub(crate) struct Repository<'p, T> {
+    progress: Progress<'p, T>,
     client: HTTPClient,
     data: IndexMap<String, RepoData>,
 }
 
-impl Repository {
-    pub(crate) fn new() -> Result<Repository> {
+impl<'p, T> Repository<'p, T> {
+    pub(crate) fn new(progress: Progress<'p, T>) -> Result<Repository<'p, T>> {
         let client = HTTPClient::builder().gzip(true).build()?;
         let data = IndexMap::<String, RepoData>::new();
 
-        Ok(Repository { client, data })
+        Ok(Repository {
+            client,
+            data,
+            progress,
+        })
     }
 
-    pub(crate) fn fetch(mut self, repos: &[config::Repository]) -> Result<Repository> {
+    pub(crate) fn fetch(mut self, repos: &[config::Repository]) -> Result<Repository<'p, T>> {
+        let bar = self.progress.bar(repos.len().try_into().unwrap());
         for repo in repos.iter() {
             let data: RepoData = match repo.url.scheme() {
                 "file" => {
@@ -72,7 +79,9 @@ impl Repository {
                     .json()?,
             };
             self.data.insert(repo.name.clone(), data);
+            bar.update(1);
         }
+        bar.finish();
 
         Ok(self)
     }
