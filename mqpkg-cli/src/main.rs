@@ -81,7 +81,9 @@ fn main() -> Result<()> {
     // Setup our console callback
     if !cli.verbose.is_silent() {
         pkg.with_console(|msg| {
-            term.write_line(msg).ok();
+            bars.suspended(|| {
+                term.write_line(msg).ok();
+            });
         });
     }
 
