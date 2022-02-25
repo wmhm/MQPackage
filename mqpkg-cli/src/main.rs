@@ -2,11 +2,14 @@
 // 2.0, and the BSD License. See the LICENSE file in the root of this repository
 // for complete details.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::RwLock;
 
 use anyhow::{anyhow, Context, Result};
 use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
+use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressStyle};
 use vfs::{PhysicalFS, VfsPath};
 
 use mqpkg::{Config, Installer, InstallerError, PackageSpecifier, SolverError};
@@ -32,6 +35,7 @@ enum Commands {
 }
 
 fn main() -> Result<()> {
+    // Parse our CLI parameters.
     let cli = Cli::parse();
     let root = match cli.target {
         Some(target) => canonicalize(target)?,
@@ -42,12 +46,36 @@ fn main() -> Result<()> {
             )
         })?,
     };
+
+    // Build our VFS, Config, and Installer objects, and a HashMap to hold our
+    // progress bars.
+    let bars = RwLock::new(HashMap::new());
     let fs: VfsPath = PhysicalFS::new(PathBuf::from(&root)).into();
     let config =
         Config::load(&fs).with_context(|| format!("invalid target directory '{}'", root))?;
     let mut pkg = Installer::new(config, fs, root.as_str())
         .with_context(|| format!("could not initialize in '{}'", root))?;
 
+    // Setup our progress callbacks.
+    pkg.with_progress_start(|id, len| {
+        let mut bs = bars.write().unwrap();
+        let bar = ProgressBar::new(len);
+        bs.insert(id.to_string(), bar);
+    });
+    pkg.with_progress_update(|id, delta| {
+        let bs = bars.read().unwrap();
+        if let Some(bar) = bs.get(id) {
+            bar.inc(delta);
+        }
+    });
+    pkg.with_progress_finish(|id| {
+        let mut bs = bars.write().unwrap();
+        if let Some(bar) = bs.remove(id) {
+            bar.finish_and_clear();
+        }
+    });
+
+    // Actually dispatch to our commands.
     match &cli.command {
         Commands::Install { packages } => match pkg.install(packages) {
             Ok(v) => Ok(v),
