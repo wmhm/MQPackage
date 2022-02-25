@@ -644,6 +644,7 @@ name = "mqpkg"
 version = "0.1.0"
 dependencies = [
  "camino",
+ "console",
  "indexmap",
  "log",
  "md5",

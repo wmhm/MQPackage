@@ -5,6 +5,7 @@
 use std::clone::Clone;
 use std::collections::HashMap;
 
+use console::{style, Emoji};
 use vfs::VfsPath;
 
 use crate::pkgdb::transaction;
@@ -23,6 +24,11 @@ mod errors;
 mod pkgdb;
 mod repository;
 mod resolver;
+
+const NSTEPS: u8 = 2;
+
+static OFFICE_PAPER: Emoji<'_, '_> = Emoji("📄  ", "");
+static LOOKING_GLASS: Emoji<'_, '_> = Emoji("🔍  ", "");
 
 type Result<T, E = InstallerError> = core::result::Result<T, E>;
 
@@ -94,9 +100,9 @@ impl<'p, T> Installer<'p, T> {
 }
 
 impl<'p, T> Installer<'p, T> {
-    fn console(&self, msg: &str) {
+    fn console<S: AsRef<str>>(&self, msg: S) {
         if let Some(cb) = &self.console {
-            (cb)(msg);
+            (cb)(msg.as_ref());
         }
     }
 
@@ -108,11 +114,19 @@ impl<'p, T> Installer<'p, T> {
             repository::Repository::new()?.fetch(self.config.repositories(), || bar.update(1))?;
         bar.finish();
 
+        self.console(step(1, OFFICE_PAPER, "Fetched package metadata"));
+
         let spinner = self.progress.spinner("Resolving dependencies");
         let solver = resolver::Solver::new(repository);
         let solution = solver.resolve(requested, || spinner.update(1))?;
         spinner.finish();
+        self.console(step(2, LOOKING_GLASS, "Resolved dependencies"));
 
         Ok(solution)
     }
+}
+
+fn step(n: u8, emoji: Emoji, msg: &str) -> String {
+    let prefix = style(format!("[{n}/{NSTEPS}]")).bold().dim();
+    format!("{prefix} {emoji}{msg}")
 }
