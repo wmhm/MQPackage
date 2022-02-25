@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use vfs::VfsPath;
 
 use crate::pkgdb::transaction;
+use crate::progress::Progress;
 use crate::types::{RequestedPackages, SolverSolution};
 
 pub use crate::config::Config;
@@ -19,36 +20,11 @@ pub(crate) mod types;
 mod config;
 mod errors;
 mod pkgdb;
+mod progress;
 mod repository;
 mod resolver;
 
 type Result<T, E = InstallerError> = core::result::Result<T, E>;
-
-struct Progress<'p> {
-    start: Option<Box<dyn FnMut(&str, u64) + 'p>>,
-    update: Option<Box<dyn FnMut(&str, u64) + 'p>>,
-    finish: Option<Box<dyn FnMut(&str) + 'p>>,
-}
-
-impl<'p> Progress<'p> {
-    fn start(&mut self, id: &str, len: u64) {
-        if let Some(cb) = &mut self.start {
-            (cb)(id, len);
-        }
-    }
-
-    fn update(&mut self, id: &str, delta: u64) {
-        if let Some(cb) = &mut self.update {
-            (cb)(id, delta);
-        }
-    }
-
-    fn finish(&mut self, id: &str) {
-        if let Some(cb) = &mut self.finish {
-            (cb)(id);
-        }
-    }
-}
 
 pub struct Installer<'p> {
     config: config::Config,
@@ -66,24 +42,20 @@ impl<'p> Installer<'p> {
         Ok(Installer {
             config,
             db,
-            progress: Progress {
-                start: None,
-                update: None,
-                finish: None,
-            },
+            progress: Progress::new(),
         })
     }
 
     pub fn with_progress_start(&mut self, cb: impl FnMut(&str, u64) + 'p) {
-        self.progress.start = Some(Box::new(cb))
+        self.progress.with_progress_start(Box::new(cb))
     }
 
     pub fn with_progress_update(&mut self, cb: impl FnMut(&str, u64) + 'p) {
-        self.progress.update = Some(Box::new(cb))
+        self.progress.with_progress_update(Box::new(cb))
     }
 
     pub fn with_progress_finish(&mut self, cb: impl FnMut(&str) + 'p) {
-        self.progress.finish = Some(Box::new(cb))
+        self.progress.with_progress_finish(Box::new(cb))
     }
 }
 
@@ -103,13 +75,13 @@ impl<'p> Installer<'p> {
                 requested.insert(req.name.clone(), req.version.clone());
             }
 
-            self.progress.start("test", 30);
+            let bar = self.progress.bar("test", 30);
             for _ in 0..30 {
                 std::thread::sleep(std::time::Duration::from_millis(250));
                 // info!(target: "mqpkg", "test");
-                self.progress.update("test", 1);
+                bar.update(1);
             }
-            self.progress.finish("test");
+            bar.finish();
 
             // Resolve all of our requirements to a full set of packages that we should install
             let _solution = self.resolve(requested)?;
