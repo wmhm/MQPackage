@@ -12,10 +12,7 @@ struct ProgressInternal<'p, T> {
 
 impl<'p, T> ProgressInternal<'p, T> {
     fn start(&mut self, len: u64) -> Option<T> {
-        match &mut self.start {
-            Some(cb) => Some((cb)(len)),
-            None => None,
-        }
+        self.start.as_mut().map(|cb| (cb)(len))
     }
 
     fn update(&mut self, bar: &T, delta: u64) {
@@ -76,10 +73,7 @@ pub(crate) struct ProgressBar<'p, T> {
 impl<'p, T> ProgressBar<'p, T> {
     fn new(internal: Arc<Mutex<ProgressInternal<'p, T>>>, len: u64) -> ProgressBar<'p, T> {
         let mut lock = internal.lock().unwrap();
-        let bar = match lock.start(len) {
-            Some(b) => Some(Box::new(b)),
-            None => None,
-        };
+        let bar = lock.start(len).map(Box::new);
 
         drop(lock);
 
