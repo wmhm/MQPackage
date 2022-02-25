@@ -5,6 +5,7 @@
 use std::clone::Clone;
 use std::collections::HashMap;
 
+use log::info;
 use vfs::VfsPath;
 
 use crate::pkgdb::transaction;
@@ -78,7 +79,15 @@ impl<'p, T> Installer<'p, T> {
             let bar = self.progress.bar(30);
             for _ in 0..30 {
                 std::thread::sleep(std::time::Duration::from_millis(250));
-                // info!(target: "mqpkg", "test");
+                info!(target: "mqpkg", "test");
+                bar.update(1);
+            }
+            bar.finish();
+
+            let bar = self.progress.bar(30);
+            for _ in 0..30 {
+                std::thread::sleep(std::time::Duration::from_millis(250));
+                info!(target: "mqpkg", "test");
                 bar.update(1);
             }
             bar.finish();

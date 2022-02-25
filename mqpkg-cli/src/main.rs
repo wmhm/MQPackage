@@ -3,14 +3,17 @@
 // for complete details.
 
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use anyhow::{anyhow, Context, Result};
 use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
-use indicatif::ProgressBar;
+use indicatif::{ProgressBar, WeakProgressBar};
 use vfs::{PhysicalFS, VfsPath};
 
 use mqpkg::{Config, Installer, InstallerError, PackageSpecifier, SolverError};
+
+mod logging;
 
 #[derive(Parser, Debug)]
 #[clap(version)]
@@ -32,7 +35,21 @@ enum Commands {
     Upgrade {},
 }
 
+fn setup_logging(bars: Arc<Mutex<Vec<WeakProgressBar>>>) {
+    let logger = logging::IndicatifAwareLogger::new(
+        pretty_env_logger::formatted_builder()
+            .filter_level(log::LevelFilter::Trace)
+            .build(),
+        bars,
+    );
+
+    logger.install();
+}
+
 fn main() -> Result<()> {
+    let bars = Arc::new(Mutex::new(Vec::new()));
+    setup_logging(bars.clone());
+
     // Parse our CLI parameters.
     let cli = Cli::parse();
     let root = match cli.target {
@@ -54,7 +71,12 @@ fn main() -> Result<()> {
         .with_context(|| format!("could not initialize in '{}'", root))?;
 
     // Setup our progress callbacks.
-    pkg.with_progress_start(ProgressBar::new);
+    pkg.with_progress_start(|len| {
+        let mut b = bars.lock().unwrap();
+        let bar = ProgressBar::new(len);
+        b.push(bar.downgrade());
+        bar
+    });
     pkg.with_progress_update(|bar, delta| bar.inc(delta));
     pkg.with_progress_finish(|bar| bar.finish_and_clear());
 
