@@ -5,7 +5,6 @@
 use std::clone::Clone;
 use std::collections::HashMap;
 
-use log::info;
 use vfs::VfsPath;
 
 use crate::pkgdb::transaction;
@@ -75,22 +74,6 @@ impl<'p, T> Installer<'p, T> {
             for req in self.db.requested()?.values() {
                 requested.insert(req.name.clone(), req.version.clone());
             }
-
-            let bar = self.progress.bar(30);
-            for _ in 0..30 {
-                std::thread::sleep(std::time::Duration::from_millis(250));
-                info!(target: "mqpkg", "test");
-                bar.update(1);
-            }
-            bar.finish();
-
-            let bar = self.progress.bar(30);
-            for _ in 0..30 {
-                std::thread::sleep(std::time::Duration::from_millis(250));
-                info!(target: "mqpkg", "test");
-                bar.update(1);
-            }
-            bar.finish();
 
             // Resolve all of our requirements to a full set of packages that we should install
             let _solution = self.resolve(requested)?;
