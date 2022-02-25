@@ -7,13 +7,28 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Context, Result};
 use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
+use clap_verbosity_flag::{Verbosity, WarnLevel};
+use console::Term;
+use indicatif::{ProgressBar, ProgressStyle};
+use log::info;
 use vfs::{PhysicalFS, VfsPath};
 
 use mqpkg::{Config, Installer, InstallerError, PackageSpecifier, SolverError};
 
-#[derive(Parser, Debug)]
+use crate::progress::SuspendableBars;
+
+pub(crate) mod progress;
+
+mod logging;
+
+const LOGNAME: &str = "mqpkg";
+
+#[derive(Debug, Parser)]
 #[clap(version)]
 struct Cli {
+    #[clap(flatten)]
+    verbose: Verbosity<WarnLevel>,
+
     #[clap(global = true, short, long)]
     target: Option<Utf8PathBuf>,
 
@@ -21,7 +36,7 @@ struct Cli {
     command: Commands,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Debug, Subcommand)]
 enum Commands {
     Install {
         #[clap(required = true)]
@@ -32,7 +47,21 @@ enum Commands {
 }
 
 fn main() -> Result<()> {
+    // Parse our CLI parameters.
     let cli = Cli::parse();
+
+    // Setup a few items for our console and progress bar handling
+    let term = Term::stdout();
+    let bars = SuspendableBars::new();
+    let style = ProgressStyle::default_bar().progress_chars("█▇▆▅▄▃▂▁  ");
+
+    // Setup our logging.
+    let render_bars =
+        cli.verbose.log_level().or(Some(log::Level::Error)).unwrap() >= log::Level::Warn;
+    logging::setup(cli.verbose.log_level_filter(), bars.clone());
+
+    // Build our VFS, Config, and Installer objects, and a HashMap to hold our
+    // progress bars.
     let root = match cli.target {
         Some(target) => canonicalize(target)?,
         None => Config::find(current_dir()?).with_context(|| {
@@ -42,12 +71,35 @@ fn main() -> Result<()> {
             )
         })?,
     };
+    info!(target: LOGNAME, "using root directory: '{}'", root);
     let fs: VfsPath = PhysicalFS::new(PathBuf::from(&root)).into();
     let config =
         Config::load(&fs).with_context(|| format!("invalid target directory '{}'", root))?;
     let mut pkg = Installer::new(config, fs, root.as_str())
         .with_context(|| format!("could not initialize in '{}'", root))?;
 
+    // Setup our console callback
+    if !cli.verbose.is_silent() {
+        pkg.with_console(|msg| {
+            bars.suspended(|| {
+                term.write_line(msg).ok();
+            });
+        });
+    }
+
+    // Setup our progress callbacks.
+    if render_bars {
+        pkg.with_progress_start(|len| {
+            bars.with_bar(ProgressBar::new(len).with_style(style.clone()))
+        });
+        pkg.with_progress_spinner(|msg| {
+            bars.with_bar(ProgressBar::new_spinner().with_message(msg))
+        });
+        pkg.with_progress_update(|bar, delta| bar.inc(delta));
+        pkg.with_progress_finish(|bar| bar.finish_and_clear());
+    }
+
+    // Actually dispatch to our commands.
     match &cli.command {
         Commands::Install { packages } => match pkg.install(packages) {
             Ok(v) => Ok(v),

@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io::BufReader;
 
 use indexmap::IndexMap;
+use log::info;
 use reqwest::blocking::Client as HTTPClient;
 use semver::VersionReq;
 use serde::Deserialize;
@@ -15,6 +16,8 @@ use url::Url;
 use crate::config;
 use crate::errors::RepositoryError;
 use crate::types::{PackageName, Version};
+
+const LOGNAME: &str = "mqpkg::repository";
 
 type Result<T, E = RepositoryError> = core::result::Result<T, E>;
 
@@ -55,7 +58,12 @@ impl Repository {
         Ok(Repository { client, data })
     }
 
-    pub(crate) fn fetch(mut self, repos: &[config::Repository]) -> Result<Repository> {
+    pub(crate) fn fetch(
+        mut self,
+        repos: &[config::Repository],
+        callback: impl Fn(),
+    ) -> Result<Repository> {
+        info!(target: LOGNAME, "fetching package metadata");
         for repo in repos.iter() {
             let data: RepoData = match repo.url.scheme() {
                 "file" => {
@@ -72,6 +80,7 @@ impl Repository {
                     .json()?,
             };
             self.data.insert(repo.name.clone(), data);
+            (callback)();
         }
 
         Ok(self)

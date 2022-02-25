@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::default::Default;
 use std::mem::drop;
 
+use log::trace;
 use semver::VersionReq;
 use serde::{Deserialize, Serialize};
 use vfs::VfsPath;
@@ -15,6 +16,8 @@ use crate::pkgdb::transactions::{Transaction, TransactionManager};
 use crate::types::{PackageName, PackageSpecifier};
 
 mod transactions;
+
+const LOGNAME: &str = "mqpkg::pkgdb";
 
 const PKGDB_DIR: &str = "pkgdb";
 const STATE_FILE: &str = "state.yml";
@@ -36,10 +39,16 @@ struct State {
 impl State {
     fn load(fs: &VfsPath) -> Result<State> {
         let filename = state_path(fs)?;
+        trace!(
+            target: LOGNAME,
+            "loading state from {:?}",
+            filename.as_str()
+        );
         let state: State = if filename.is_file()? {
             serde_yaml::from_reader(filename.open_file()?)
                 .map_err(|source| DBError::InvalidState { source })?
         } else {
+            trace!(target: LOGNAME, "could not find state, using default");
             State {
                 ..Default::default()
             }
@@ -51,7 +60,9 @@ impl State {
     fn save(&self, fs: &VfsPath) -> Result<()> {
         ensure_dir(&pkgdb_path(fs)?)?;
 
-        let file = state_path(fs)?.create_file()?;
+        let filename = state_path(fs)?;
+        trace!(target: LOGNAME, "saving state to {:?}", filename.as_str());
+        let file = filename.create_file()?;
         serde_yaml::to_writer(file, self).map_err(|source| DBError::InvalidState { source })?;
         Ok(())
     }
@@ -77,10 +88,13 @@ impl Database {
     }
 
     pub(crate) fn begin<'r>(&mut self, txnm: &'r TransactionManager) -> Result<Transaction<'r>> {
-        Ok(txnm.begin()?)
+        let txn = txnm.begin()?;
+        trace!(target: LOGNAME, "begin transaction");
+        Ok(txn)
     }
 
     pub(crate) fn commit(&mut self, txn: Transaction) -> Result<()> {
+        trace!(target: LOGNAME, "commit transaction");
         let fs = self.fs.clone();
 
         // Save all our various pieces of data that we've built up in our
@@ -99,7 +113,14 @@ impl Database {
     }
 
     pub(crate) fn add(&mut self, package: &PackageSpecifier) -> Result<()> {
-        self.state()?.requested.insert(
+        let state = self.state()?;
+        trace!(
+            target: LOGNAME,
+            "adding {}({}) to requested packages",
+            package.name,
+            package.version
+        );
+        state.requested.insert(
             package.name.clone(),
             PackageRequest {
                 name: package.name.clone(),

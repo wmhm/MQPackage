@@ -5,6 +5,7 @@
 use std::borrow::Borrow;
 use std::fmt;
 
+use log::{info, log_enabled, trace};
 use pubgrub::error::PubGrubError;
 use pubgrub::range::Range;
 use pubgrub::report::{DefaultStringReporter, Reporter};
@@ -18,6 +19,8 @@ use thiserror::Error;
 use crate::errors::SolverError;
 use crate::repository::Repository;
 use crate::types::{DerivedResult, PackageName, RequestedPackages, SolverSolution, Version};
+
+const LOGNAME: &str = "mqpkg::resolver";
 
 // Note: The name used here **MUST** be an invalid name for packages to have,
 //       if it's not, then our root package (which represents this stuff the
@@ -99,7 +102,11 @@ impl Solver {
         Solver { repository }
     }
 
-    pub(crate) fn resolve(&self, reqs: RequestedPackages) -> Result<SolverSolution, SolverError> {
+    pub(crate) fn resolve(
+        &self,
+        reqs: RequestedPackages,
+        callback: impl Fn(),
+    ) -> Result<SolverSolution, SolverError> {
         let package = PackageName::new(ROOT_NAME);
         let version = Version::new(ROOT_VER.0, ROOT_VER.1, ROOT_VER.2);
 
@@ -107,7 +114,10 @@ impl Solver {
             repository: &self.repository,
             root: package.clone(),
             requested: reqs,
+            callback: Box::new(callback),
         };
+
+        info!(target: LOGNAME, "resolving requested packages");
 
         resolve(&resolver, package, version).map_err(SolverError::from_pubgrub)
     }
@@ -119,28 +129,60 @@ impl Solver {
 // to persist between runs will only live on the InternalSolver. Anything we want
 // to persist long term, lives on the Solver and gets passed into InternalSolver
 // as a reference.
-struct InternalSolver<'r> {
+struct InternalSolver<'r, 'c> {
     repository: &'r Repository,
     root: PackageName,
     requested: RequestedPackages,
+    callback: Box<dyn Fn() + 'c>,
 }
 
-impl<'r> DependencyProvider<PackageName, Version> for InternalSolver<'r> {
-    fn choose_package_version<T: Borrow<PackageName>, U: Borrow<Range<Version>>>(
+impl<'r, 'c> DependencyProvider<PackageName, Version> for InternalSolver<'r, 'c> {
+    fn should_cancel(&self) -> Result<(), Box<dyn std::error::Error>> {
+        (self.callback)();
+        Ok(())
+    }
+
+    fn choose_package_version<P: Borrow<PackageName>, U: Borrow<Range<Version>>>(
         &self,
-        potential_packages: impl Iterator<Item = (T, U)>,
-    ) -> Result<(T, Option<Version>), Box<dyn std::error::Error>> {
-        Ok(choose_package_with_fewest_versions(
+        potential_packages: impl Iterator<Item = (P, U)>,
+    ) -> Result<(P, Option<Version>), Box<dyn std::error::Error>> {
+        let (package, version) = choose_package_with_fewest_versions(
             |package| {
-                if package == &self.root {
+                let versions = if package == &self.root {
                     vec![Version::new(ROOT_VER.0, ROOT_VER.1, ROOT_VER.2)]
                 } else {
                     self.repository.versions(package)
+                };
+
+                if log_enabled!(log::Level::Trace) {
+                    let versions_str: Vec<String> =
+                        versions.iter().map(|v| v.to_string()).collect();
+                    trace!(
+                        target: LOGNAME,
+                        "found versions for {}: [{}]",
+                        package,
+                        versions_str.join(", ")
+                    );
                 }
-                .into_iter()
+
+                versions.into_iter()
             },
             potential_packages,
-        ))
+        );
+
+        if log_enabled!(log::Level::Trace) {
+            trace!(
+                target: LOGNAME,
+                "selected {} ({}) as next candidate",
+                package.borrow(),
+                version
+                    .clone()
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| "None".to_string())
+            );
+        }
+
+        Ok((package, version))
     }
 
     fn get_dependencies(
@@ -156,6 +198,21 @@ impl<'r> DependencyProvider<PackageName, Version> for InternalSolver<'r> {
             self.repository.dependencies(package, version)
         };
 
+        if log_enabled!(log::Level::Trace) {
+            let req_str: Vec<String> = dependencies
+                .iter()
+                .map(|(k, v)| format!("{}({})", k, v))
+                .collect();
+            trace!(
+                target: LOGNAME,
+                "found dependencies for {} ({}): [{}]",
+                package,
+                version,
+                req_str.join(", ")
+            );
+        }
+
+        // Convert all of our semver::VersionReq into pubgrub::Range
         for (dep, req) in dependencies {
             if req.comparators.is_empty() {
                 merge(&mut result, &dep, Range::any())
