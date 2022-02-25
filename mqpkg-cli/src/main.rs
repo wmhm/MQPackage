@@ -9,7 +9,7 @@ use anyhow::{anyhow, Context, Result};
 use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
 use clap_verbosity_flag::{LogLevel as BaseLogLevel, Verbosity};
-use indicatif::ProgressBar;
+use indicatif::{ProgressBar, ProgressStyle};
 use vfs::{PhysicalFS, VfsPath};
 
 use mqpkg::{Config, Installer, InstallerError, PackageSpecifier, SolverError};
@@ -52,8 +52,11 @@ fn main() -> Result<()> {
     // Parse our CLI parameters.
     let cli = Cli::parse();
 
-    // Setup our logging.
+    // Setup a few items for our progress bar handling
+    let style = ProgressStyle::default_bar().progress_chars("█▇▆▅▄▃▂▁  ");
     let bars = Arc::new(Mutex::new(Vec::new()));
+
+    // Setup our logging.
     let render_bars = cli.verbose.log_level().or(Some(log::Level::Error)).unwrap()
         >= LogLevel::default().unwrap();
     logging::setup(cli.verbose.log_level_filter(), bars.clone());
@@ -80,6 +83,7 @@ fn main() -> Result<()> {
         pkg.with_progress_start(|len| {
             let mut b = bars.lock().unwrap();
             let bar = ProgressBar::new(len);
+            bar.set_style(style.clone());
             b.push(bar.downgrade());
             bar
         });

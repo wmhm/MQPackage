@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io::BufReader;
 
 use indexmap::IndexMap;
+use log::info;
 use reqwest::blocking::Client as HTTPClient;
 use semver::VersionReq;
 use serde::Deserialize;
@@ -62,6 +63,7 @@ impl<'p, T> Repository<'p, T> {
     }
 
     pub(crate) fn fetch(mut self, repos: &[config::Repository]) -> Result<Repository<'p, T>> {
+        info!(target: "mqpkg::repository::fetch", "Fetching package metadata");
         let bar = self.progress.bar(repos.len().try_into().unwrap());
         for repo in repos.iter() {
             let data: RepoData = match repo.url.scheme() {
