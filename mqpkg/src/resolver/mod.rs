@@ -5,7 +5,7 @@
 use std::borrow::Borrow;
 use std::fmt;
 
-use log::{info, log_enabled, trace};
+use log::{debug, info, log_enabled, trace};
 use pubgrub::error::PubGrubError;
 use pubgrub::report::{DefaultStringReporter, DerivationTree, Reporter};
 use pubgrub::solver::{
@@ -117,7 +117,7 @@ impl Solver {
         // module should generally need to be aware it even exists.
         result.remove(&package);
 
-        if log_enabled!(log::Level::Trace) {
+        if log_enabled!(log::Level::Debug) {
             let mut rpairs: Vec<(&PackageName, &Candidate)> = result.iter().collect();
             rpairs.sort();
             let results_str: Vec<String> = rpairs
@@ -127,7 +127,7 @@ impl Solver {
                     format!("{rid}:{p} ({c})")
                 })
                 .collect();
-            trace!(
+            debug!(
                 target: LOGNAME,
                 "solution found: [{}]",
                 results_str.join(", ")
