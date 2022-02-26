@@ -7,21 +7,21 @@ use std::fmt;
 use pubgrub::range::Range;
 use pubgrub::version::Version as PVersion;
 use pubgrub::version_set::VersionSet;
-use semver::{Prerelease, Version, VersionReq};
+use semver::{Prerelease, VersionReq};
 
 use crate::types::Candidate;
 
 impl PVersion for Candidate {
     fn lowest() -> Candidate {
-        Candidate::new(Version::new(0, 0, 0))
+        Candidate::from_parts(0, 0, 0)
     }
 
     fn bump(&self) -> Candidate {
-        Candidate::new(Version::new(
+        Candidate::from_parts(
             self.version().major,
             self.version().minor,
             self.version().patch + 1,
-        ))
+        )
     }
 }
 
@@ -38,7 +38,7 @@ impl fmt::Display for CandidateSet {
 }
 
 impl CandidateSet {
-    pub(super) fn req(req: VersionReq) -> CandidateSet {
+    pub(super) fn req(req: &VersionReq) -> CandidateSet {
         // By default, we allow *any* normal version to be accepted,
         // then we futher constrain those down.
         let mut range = Range::full();

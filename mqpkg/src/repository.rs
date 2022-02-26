@@ -95,8 +95,11 @@ impl Repository {
         // the full list later.
         for (repo, data) in self.data.iter() {
             if let Some(packages) = data.packages.get(package) {
-                for version in packages.keys() {
-                    candidates.push(Candidate::new(version.clone()).with_repository(repo.clone()));
+                for (version, release) in packages.iter() {
+                    candidates.push(
+                        Candidate::new(version.clone(), release.dependencies.clone())
+                            .with_repository(repo.clone()),
+                    );
                 }
             }
         }
@@ -107,25 +110,5 @@ impl Repository {
         // this will put Version -> Repository.
         candidates.sort_by(|l, r| l.cmp(r).reverse());
         candidates
-    }
-
-    pub(crate) fn dependencies(
-        &self,
-        package: &PackageName,
-        version: &Version,
-    ) -> HashMap<PackageName, VersionReq> {
-        let mut deps = HashMap::new();
-
-        for data in self.data.values() {
-            if let Some(packages) = data.packages.get(package) {
-                if let Some(release) = packages.get(version) {
-                    for (key, value) in release.dependencies.iter() {
-                        deps.insert(key.clone(), value.clone());
-                    }
-                }
-            }
-        }
-
-        deps
     }
 }

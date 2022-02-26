@@ -98,7 +98,7 @@ impl Solver {
         callback: impl Fn(),
     ) -> Result<SolverSolution, SolverError> {
         let package = PackageName::new(ROOT_NAME);
-        let version = Candidate::root();
+        let version = Candidate::root(reqs.clone());
 
         let resolver = InternalSolver {
             repository: &self.repository,
@@ -146,7 +146,7 @@ impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r
         let (package, version) = choose_package_with_fewest_versions(
             |package| {
                 let candidates = if package == &self.root {
-                    vec![Candidate::root()]
+                    vec![Candidate::root(self.requested.clone())]
                 } else {
                     self.repository.candidates(package)
                 };
@@ -187,21 +187,14 @@ impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r
         package: &PackageName,
         candidate: &Candidate,
     ) -> Result<Dependencies<PackageName, CandidateSet>, Box<dyn std::error::Error>> {
-        let mut result = DependencyConstraints::<PackageName, CandidateSet>::default();
-
-        let dependencies = if package == &self.root {
-            self.requested.clone()
-        } else {
-            self.repository.dependencies(package, candidate.version())
-        };
-
         if log_enabled!(log::Level::Trace) {
             let version = if package == &self.root {
                 "".to_string()
             } else {
                 format!(" ({})", candidate)
             };
-            let req_str: Vec<String> = dependencies
+            let req_str: Vec<String> = candidate
+                .dependencies()
                 .iter()
                 .map(|(k, v)| format!("{}({})", k, v))
                 .collect();
@@ -214,8 +207,9 @@ impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r
             );
         }
 
-        for (dep, req) in dependencies {
-            result.insert(dep, CandidateSet::req(req));
+        let mut result = DependencyConstraints::<PackageName, CandidateSet>::default();
+        for (dep, req) in candidate.dependencies().iter() {
+            result.insert(dep.clone(), CandidateSet::req(req));
         }
 
         Ok(Dependencies::Known(result))

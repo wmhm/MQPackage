@@ -89,6 +89,7 @@ pub(crate) type RequestedPackages = HashMap<PackageName, VersionReq>;
 pub struct Candidate {
     is_root: bool,
     version: Version,
+    dependencies: Option<HashMap<PackageName, VersionReq>>,
     repository: Option<Repository>,
 }
 
@@ -100,36 +101,24 @@ impl Candidate {
     pub(crate) fn repository(&self) -> Option<&Repository> {
         self.repository.as_ref()
     }
-}
 
-impl PartialEq for Candidate {
-    fn eq(&self, other: &Self) -> bool {
-        self.version == other.version
+    pub(crate) fn dependencies(&self) -> &HashMap<PackageName, VersionReq> {
+        // This code will panic if someone calls dependencies without this Candidate
+        // having dependencies. This is important, both Candidate::new() and
+        // Candidate::root() require passing in dependencies, it's only ::from_parts
+        // and ::from_parts_pre that do not, which are only inteded to be used by
+        // the resolver when constructing CandidateSets, and not by anyone else, doing
+        // so is an error.
+        self.dependencies.as_ref().unwrap()
     }
 }
-impl Eq for Candidate {}
 
 impl Candidate {
-    pub(crate) fn new(version: Version) -> Candidate {
-        Candidate {
-            is_root: false,
-            version,
-            repository: None,
-        }
-    }
-
-    pub(crate) fn root() -> Candidate {
-        Candidate {
-            is_root: true,
-            version: Version::new(0, 0, 0),
-            repository: None,
-        }
-    }
-
     pub(crate) fn from_parts(major: u64, minor: u64, patch: u64) -> Candidate {
         Candidate {
             is_root: false,
             version: Version::new(major, minor, patch),
+            dependencies: None,
             repository: None,
         }
     }
@@ -141,6 +130,34 @@ impl Candidate {
         Candidate {
             is_root: false,
             version,
+            dependencies: None,
+            repository: None,
+        }
+    }
+}
+
+impl PartialEq for Candidate {
+    fn eq(&self, other: &Self) -> bool {
+        self.version == other.version
+    }
+}
+impl Eq for Candidate {}
+
+impl Candidate {
+    pub(crate) fn new(version: Version, deps: HashMap<PackageName, VersionReq>) -> Candidate {
+        Candidate {
+            is_root: false,
+            version,
+            dependencies: Some(deps),
+            repository: None,
+        }
+    }
+
+    pub(crate) fn root(deps: HashMap<PackageName, VersionReq>) -> Candidate {
+        Candidate {
+            is_root: true,
+            version: Version::new(0, 0, 0),
+            dependencies: Some(deps),
             repository: None,
         }
     }
