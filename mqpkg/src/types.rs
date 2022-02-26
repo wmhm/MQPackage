@@ -3,18 +3,16 @@
 // for complete details.
 
 use std::clone::Clone;
-use std::cmp::{Eq, Ord, PartialEq};
+use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
 use std::str::FromStr;
 
-use pubgrub::report::DerivationTree;
-use pubgrub::type_aliases::SelectedDependencies;
-use semver::{Version as SemVer, VersionReq};
+use semver::VersionReq;
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{PackageNameError, PackageSpecifierError, VersionError};
+use crate::errors::{PackageNameError, PackageSpecifierError};
 
 #[derive(Serialize, Deserialize, Clone, Eq, Debug, Hash, PartialEq)]
 pub struct PackageName(String);
@@ -61,41 +59,6 @@ impl FromStr for PackageName {
     }
 }
 
-#[derive(Deserialize, Debug, Clone, Ord, Eq, PartialEq, PartialOrd, Hash)]
-pub struct Version(SemVer);
-
-impl Version {
-    pub(crate) fn new(major: u64, minor: u64, patch: u64) -> Version {
-        Version(SemVer::new(major, minor, patch))
-    }
-
-    pub(crate) fn major(&self) -> u64 {
-        self.0.major
-    }
-
-    pub(crate) fn minor(&self) -> u64 {
-        self.0.minor
-    }
-
-    pub(crate) fn patch(&self) -> u64 {
-        self.0.patch
-    }
-}
-
-impl FromStr for Version {
-    type Err = VersionError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        Ok(Version(SemVer::parse(value)?))
-    }
-}
-
-impl fmt::Display for Version {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone, Eq, Debug, Hash, PartialEq)]
 pub struct PackageSpecifier {
     pub(crate) name: PackageName,
@@ -118,8 +81,4 @@ impl FromStr for PackageSpecifier {
     }
 }
 
-pub(crate) type SolverSolution = SelectedDependencies<PackageName, Version>;
-
 pub(crate) type RequestedPackages = HashMap<PackageName, VersionReq>;
-
-pub type DerivedResult = DerivationTree<PackageName, Version>;

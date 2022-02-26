@@ -10,7 +10,9 @@ use vfs::VfsPath;
 
 use crate::pkgdb::transaction;
 use crate::progress::Progress;
-use crate::types::{RequestedPackages, SolverSolution};
+use crate::repository::Repository;
+use crate::resolver::{Solver, SolverSolution};
+use crate::types::RequestedPackages;
 
 pub use crate::config::Config;
 pub use crate::errors::{InstallerError, SolverError};
@@ -110,14 +112,13 @@ impl<'p, T> Installer<'p, T> {
         let bar = self
             .progress
             .bar(self.config.repositories().len().try_into().unwrap());
-        let repository =
-            repository::Repository::new()?.fetch(self.config.repositories(), || bar.update(1))?;
+        let repository = Repository::new()?.fetch(self.config.repositories(), || bar.update(1))?;
         bar.finish();
 
         self.console(step(1, OFFICE_PAPER, "Fetched package metadata"));
 
         let spinner = self.progress.spinner("Resolving dependencies");
-        let solver = resolver::Solver::new(repository);
+        let solver = Solver::new(repository);
         let solution = solver.resolve(requested, || spinner.update(1))?;
         spinner.finish();
         self.console(step(2, LOOKING_GLASS, "Resolved dependencies"));

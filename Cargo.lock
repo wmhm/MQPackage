@@ -877,8 +877,7 @@ dependencies = [
 [[package]]
 name = "pubgrub"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdd14552ad5f5d743a323c10d576f26822a044355d6601f377d813ece46f38fd"
+source = "git+https://github.com/pubgrub-rs/pubgrub.git?rev=7727938886fd3598f29cc2c8eb06921c121aaa9d#7727938886fd3598f29cc2c8eb06921c121aaa9d"
 dependencies = [
  "rustc-hash",
  "thiserror",
