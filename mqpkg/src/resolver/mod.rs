@@ -41,12 +41,13 @@ impl SolverError {
                 dependent,
             } => SolverError::DependencyOnTheEmptySet {
                 package,
-                version,
+                version: Box::new(version),
                 dependent,
             },
-            PubGrubError::SelfDependency { package, version } => {
-                SolverError::SelfDependency { package, version }
-            }
+            PubGrubError::SelfDependency { package, version } => SolverError::SelfDependency {
+                package,
+                version: Box::new(version),
+            },
             PubGrubError::Failure(s) => SolverError::Failure(s),
             PubGrubError::ErrorRetrievingDependencies { .. } => SolverError::Impossible,
             PubGrubError::ErrorChoosingPackageVersion(_) => SolverError::Impossible,
