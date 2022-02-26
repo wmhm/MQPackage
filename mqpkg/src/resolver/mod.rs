@@ -116,7 +116,14 @@ impl Solver {
 
         info!(target: LOGNAME, "resolving requested packages");
 
-        resolve(&resolver, package, version).map_err(SolverError::from_pubgrub)
+        let mut result =
+            resolve(&resolver, package.clone(), version).map_err(SolverError::from_pubgrub)?;
+
+        // Just remove our fake "root" package from our solution, since nothing but this
+        // module should generally need to be aware it even exists.
+        result.remove(&package);
+
+        Ok(result)
     }
 }
 
