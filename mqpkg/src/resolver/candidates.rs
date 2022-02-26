@@ -2,98 +2,26 @@
 // 2.0, and the BSD License. See the LICENSE file in the root of this repository
 // for complete details.
 
-use std::cmp::Ordering;
 use std::fmt;
 
 use pubgrub::range::Range;
 use pubgrub::version::Version as PVersion;
 use pubgrub::version_set::VersionSet;
-use semver::{Prerelease, Version, VersionReq};
+use semver::{Prerelease, VersionReq};
 
-#[derive(Debug, Clone)]
-pub struct Candidate {
-    is_root: bool,
-    pub(super) version: Version,
-}
-
-impl PartialEq for Candidate {
-    fn eq(&self, other: &Self) -> bool {
-        self.version == other.version
-    }
-}
-impl Eq for Candidate {}
-
-impl Candidate {
-    pub(super) fn new(version: Version) -> Candidate {
-        Candidate {
-            is_root: false,
-            version,
-        }
-    }
-
-    pub(super) fn root() -> Candidate {
-        Candidate {
-            is_root: true,
-            version: Version::new(0, 0, 0),
-        }
-    }
-
-    fn from_parts(major: u64, minor: u64, patch: u64) -> Candidate {
-        Candidate {
-            is_root: false,
-            version: Version::new(major, minor, patch),
-        }
-    }
-
-    fn from_parts_pre(major: u64, minor: u64, patch: u64, pre: Prerelease) -> Candidate {
-        let mut version = Version::new(major, minor, patch);
-        version.pre = pre;
-
-        Candidate {
-            is_root: false,
-            version,
-        }
-    }
-}
-
-impl fmt::Display for Candidate {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // Note: This relies on a hack where our root versions have an internal,
-        // otherwise ignored, marker that suppresses their fmt::Display output.
-        //
-        // This would be better handled by a custom reporter, but that can be
-        // done later.
-        if !self.is_root {
-            write!(f, "{}", self.version)?
-        }
-
-        Ok(())
-    }
-}
-
-impl Ord for Candidate {
-    fn cmp(&self, other: &Candidate) -> Ordering {
-        self.version.cmp(&other.version)
-    }
-}
-
-impl PartialOrd for Candidate {
-    fn partial_cmp(&self, other: &Candidate) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
+use crate::types::Candidate;
 
 impl PVersion for Candidate {
     fn lowest() -> Candidate {
-        Candidate::new(Version::new(0, 0, 0))
+        Candidate::from_parts(0, 0, 0)
     }
 
     fn bump(&self) -> Candidate {
-        Candidate::new(Version::new(
-            self.version.major,
-            self.version.minor,
-            self.version.patch + 1,
-        ))
+        Candidate::from_parts(
+            self.version().major,
+            self.version().minor,
+            self.version().patch + 1,
+        )
     }
 }
 
@@ -110,7 +38,7 @@ impl fmt::Display for CandidateSet {
 }
 
 impl CandidateSet {
-    pub(super) fn req(req: VersionReq) -> CandidateSet {
+    pub(super) fn req(req: &VersionReq) -> CandidateSet {
         // By default, we allow *any* normal version to be accepted,
         // then we futher constrain those down.
         let mut range = Range::full();
@@ -175,7 +103,7 @@ impl VersionSet for CandidateSet {
         // When our exact version is a pre-release, if our incoming
         // version is not, then it can't match (thus range is None)
         // and if it is, then normal Range::exact() can match.
-        if v.version.pre.is_empty() {
+        if v.version().pre.is_empty() {
             CandidateSet {
                 range: Range::exact(v),
                 pre: Range::none(),
@@ -223,7 +151,7 @@ impl VersionSet for CandidateSet {
         // However, that same thing does not hold true when checking a
         // final release, as we have no need to additionally constrain
         // those.
-        if v.version.pre.is_empty() {
+        if v.version().pre.is_empty() {
             self.range.contains(v)
         } else {
             self.pre.contains(v)

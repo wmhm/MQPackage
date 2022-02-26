@@ -4,8 +4,8 @@
 
 use thiserror::Error;
 
-use crate::resolver::{Candidate, DerivedResult};
-use crate::types::PackageName;
+use crate::resolver::DerivedResult;
+use crate::types::{Candidate, PackageName};
 
 #[derive(Error, Debug)]
 pub enum InstallerError {
@@ -104,7 +104,7 @@ pub enum SolverError {
         /// Package whose dependencies we want.
         package: PackageName,
         /// Version of the package for which we want the dependencies.
-        version: Candidate,
+        version: Box<Candidate>,
         /// The dependent package that requires us to pick from the empty set.
         dependent: PackageName,
     },
@@ -114,7 +114,7 @@ pub enum SolverError {
         /// Package whose dependencies we want.
         package: PackageName,
         /// Version of the package for which we want the dependencies.
-        version: Candidate,
+        version: Box<Candidate>,
     },
 
     // PubGrubError has a Failure error, and I'm not sure where it would actually

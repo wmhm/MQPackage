@@ -16,9 +16,7 @@ use pubgrub::type_aliases::{DependencyConstraints, SelectedDependencies};
 use crate::errors::SolverError;
 use crate::repository::Repository;
 use crate::resolver::candidates::CandidateSet;
-use crate::types::{PackageName, RequestedPackages};
-
-pub(crate) use crate::resolver::candidates::Candidate;
+use crate::types::{Candidate, PackageName, RequestedPackages};
 
 mod candidates;
 
@@ -43,12 +41,13 @@ impl SolverError {
                 dependent,
             } => SolverError::DependencyOnTheEmptySet {
                 package,
-                version,
+                version: Box::new(version),
                 dependent,
             },
-            PubGrubError::SelfDependency { package, version } => {
-                SolverError::SelfDependency { package, version }
-            }
+            PubGrubError::SelfDependency { package, version } => SolverError::SelfDependency {
+                package,
+                version: Box::new(version),
+            },
             PubGrubError::Failure(s) => SolverError::Failure(s),
             PubGrubError::ErrorRetrievingDependencies { .. } => SolverError::Impossible,
             PubGrubError::ErrorChoosingPackageVersion(_) => SolverError::Impossible,
@@ -100,7 +99,7 @@ impl Solver {
         callback: impl Fn(),
     ) -> Result<SolverSolution, SolverError> {
         let package = PackageName::new(ROOT_NAME);
-        let version = Candidate::root();
+        let version = Candidate::root(reqs.clone());
 
         let resolver = InternalSolver {
             repository: &self.repository,
@@ -147,19 +146,15 @@ impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r
     ) -> Result<(P, Option<Candidate>), Box<dyn std::error::Error>> {
         let (package, version) = choose_package_with_fewest_versions(
             |package| {
-                let versions = if package == &self.root {
-                    vec![Candidate::root()]
+                let candidates = if package == &self.root {
+                    vec![Candidate::root(self.requested.clone())]
                 } else {
-                    self.repository
-                        .versions(package)
-                        .into_iter()
-                        .map(Candidate::new)
-                        .collect()
+                    self.repository.candidates(package)
                 };
 
                 if log_enabled!(log::Level::Trace) && package != &self.root {
                     let versions_str: Vec<String> =
-                        versions.iter().map(|v| v.to_string()).collect();
+                        candidates.iter().map(|v| v.to_string()).collect();
                     trace!(
                         target: LOGNAME,
                         "found versions for {}: [{}]",
@@ -168,7 +163,7 @@ impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r
                     );
                 }
 
-                versions.into_iter()
+                candidates.into_iter()
             },
             potential_packages,
         );
@@ -193,21 +188,14 @@ impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r
         package: &PackageName,
         candidate: &Candidate,
     ) -> Result<Dependencies<PackageName, CandidateSet>, Box<dyn std::error::Error>> {
-        let mut result = DependencyConstraints::<PackageName, CandidateSet>::default();
-
-        let dependencies = if package == &self.root {
-            self.requested.clone()
-        } else {
-            self.repository.dependencies(package, &candidate.version)
-        };
-
         if log_enabled!(log::Level::Trace) {
             let version = if package == &self.root {
                 "".to_string()
             } else {
                 format!(" ({})", candidate)
             };
-            let req_str: Vec<String> = dependencies
+            let req_str: Vec<String> = candidate
+                .dependencies()
                 .iter()
                 .map(|(k, v)| format!("{}({})", k, v))
                 .collect();
@@ -220,8 +208,9 @@ impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r
             );
         }
 
-        for (dep, req) in dependencies {
-            result.insert(dep, CandidateSet::req(req));
+        let mut result = DependencyConstraints::<PackageName, CandidateSet>::default();
+        for (dep, req) in candidate.dependencies().iter() {
+            result.insert(dep.clone(), CandidateSet::req(req));
         }
 
         Ok(Dependencies::Known(result))

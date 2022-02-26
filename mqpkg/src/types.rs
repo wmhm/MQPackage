@@ -3,15 +3,17 @@
 // for complete details.
 
 use std::clone::Clone;
+use std::cmp::Ordering;
 use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
 use std::str::FromStr;
 
-use semver::VersionReq;
+use semver::{Prerelease, Version, VersionReq};
 use serde::{Deserialize, Serialize};
 
+use crate::config::Repository;
 use crate::errors::{PackageNameError, PackageSpecifierError};
 
 #[derive(Serialize, Deserialize, Clone, Eq, Debug, Hash, PartialEq)]
@@ -82,3 +84,111 @@ impl FromStr for PackageSpecifier {
 }
 
 pub(crate) type RequestedPackages = HashMap<PackageName, VersionReq>;
+
+#[derive(Debug, Clone)]
+pub struct Candidate {
+    is_root: bool,
+    version: Version,
+    dependencies: Option<HashMap<PackageName, VersionReq>>,
+    repository: Option<Repository>,
+}
+
+impl Candidate {
+    pub(crate) fn version(&self) -> &Version {
+        &self.version
+    }
+
+    pub(crate) fn dependencies(&self) -> &HashMap<PackageName, VersionReq> {
+        // This code will panic if someone calls dependencies without this Candidate
+        // having dependencies. This is important, both Candidate::new() and
+        // Candidate::root() require passing in dependencies, it's only ::from_parts
+        // and ::from_parts_pre that do not, which are only inteded to be used by
+        // the resolver when constructing CandidateSets, and not by anyone else, doing
+        // so is an error.
+        self.dependencies.as_ref().unwrap()
+    }
+}
+
+impl Candidate {
+    pub(crate) fn from_parts(major: u64, minor: u64, patch: u64) -> Candidate {
+        Candidate {
+            is_root: false,
+            version: Version::new(major, minor, patch),
+            dependencies: None,
+            repository: None,
+        }
+    }
+
+    pub(crate) fn from_parts_pre(major: u64, minor: u64, patch: u64, pre: Prerelease) -> Candidate {
+        let mut version = Version::new(major, minor, patch);
+        version.pre = pre;
+
+        Candidate {
+            is_root: false,
+            version,
+            dependencies: None,
+            repository: None,
+        }
+    }
+}
+
+impl PartialEq for Candidate {
+    fn eq(&self, other: &Self) -> bool {
+        self.version == other.version
+    }
+}
+impl Eq for Candidate {}
+
+impl Candidate {
+    pub(crate) fn new(version: Version, deps: HashMap<PackageName, VersionReq>) -> Candidate {
+        Candidate {
+            is_root: false,
+            version,
+            dependencies: Some(deps),
+            repository: None,
+        }
+    }
+
+    pub(crate) fn root(deps: HashMap<PackageName, VersionReq>) -> Candidate {
+        Candidate {
+            is_root: true,
+            version: Version::new(0, 0, 0),
+            dependencies: Some(deps),
+            repository: None,
+        }
+    }
+
+    pub(crate) fn with_repository(&self, repo: Repository) -> Candidate {
+        let mut c = self.clone();
+
+        c.repository = Some(repo);
+        c
+    }
+}
+
+impl fmt::Display for Candidate {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Note: This relies on a hack where our root versions have an internal,
+        // otherwise ignored, marker that suppresses their fmt::Display output.
+        //
+        // This would be better handled by a custom reporter, but that can be
+        // done later.
+        if !self.is_root {
+            write!(f, "{}", self.version)?
+        }
+
+        Ok(())
+    }
+}
+
+impl Ord for Candidate {
+    fn cmp(&self, other: &Candidate) -> Ordering {
+        self.version.cmp(&other.version)
+    }
+}
+
+impl PartialOrd for Candidate {
+    fn partial_cmp(&self, other: &Candidate) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
