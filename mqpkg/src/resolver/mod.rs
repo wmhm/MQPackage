@@ -32,7 +32,7 @@ const ROOT_NAME: &str = ":requested:";
 
 // Note: The actual version doesn't matter here. This is just a marker so that
 //       we can resolve the packages that the user has depended on.
-const ROOT_VER: (u64, u64, u64) = (1, 0, 0);
+const ROOT_VER: (u64, u64, u64) = (0, 0, 0);
 
 pub type DerivedResult = DerivationTree<PackageName, CandidateSet>;
 
