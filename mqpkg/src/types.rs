@@ -98,10 +98,6 @@ impl Candidate {
         &self.version
     }
 
-    pub(crate) fn repository(&self) -> Option<&Repository> {
-        self.repository.as_ref()
-    }
-
     pub(crate) fn dependencies(&self) -> &HashMap<PackageName, VersionReq> {
         // This code will panic if someone calls dependencies without this Candidate
         // having dependencies. This is important, both Candidate::new() and
