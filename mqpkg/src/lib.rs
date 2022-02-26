@@ -27,8 +27,8 @@ mod pkgdb;
 mod repository;
 mod resolver;
 
-static OFFICE_PAPER: Emoji<'_, '_> = Emoji("📄  ", "");
-static LOOKING_GLASS: Emoji<'_, '_> = Emoji("🔍  ", "");
+static OFFICE_PAPER: Emoji<'_, '_> = Emoji("📄 ", "");
+static LOOKING_GLASS: Emoji<'_, '_> = Emoji("🔍 ", "");
 
 type Result<T, E = InstallerError> = core::result::Result<T, E>;
 
