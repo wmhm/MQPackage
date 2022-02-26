@@ -10,18 +10,37 @@ use pubgrub::version::Version as PVersion;
 use pubgrub::version_set::VersionSet;
 use semver::{Prerelease, Version, VersionReq};
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Candidate {
+    is_root: bool,
     pub(super) version: Version,
 }
 
+impl PartialEq for Candidate {
+    fn eq(&self, other: &Self) -> bool {
+        self.version == other.version
+    }
+}
+impl Eq for Candidate {}
+
 impl Candidate {
     pub(super) fn new(version: Version) -> Candidate {
-        Candidate { version }
+        Candidate {
+            is_root: false,
+            version,
+        }
+    }
+
+    pub(super) fn root() -> Candidate {
+        Candidate {
+            is_root: true,
+            version: Version::new(0, 0, 0),
+        }
     }
 
     fn from_parts(major: u64, minor: u64, patch: u64) -> Candidate {
         Candidate {
+            is_root: false,
             version: Version::new(major, minor, patch),
         }
     }
@@ -30,13 +49,25 @@ impl Candidate {
         let mut version = Version::new(major, minor, patch);
         version.pre = pre;
 
-        Candidate { version }
+        Candidate {
+            is_root: false,
+            version,
+        }
     }
 }
 
 impl fmt::Display for Candidate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.version)
+        // Note: This relies on a hack where our root versions have an internal,
+        // otherwise ignored, marker that suppresses their fmt::Display output.
+        //
+        // This would be better handled by a custom reporter, but that can be
+        // done later.
+        if !self.is_root {
+            write!(f, "{}", self.version)?
+        }
+
+        Ok(())
     }
 }
 

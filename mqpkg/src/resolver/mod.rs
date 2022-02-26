@@ -12,7 +12,6 @@ use pubgrub::solver::{
     choose_package_with_fewest_versions, resolve, Dependencies, DependencyProvider,
 };
 use pubgrub::type_aliases::{DependencyConstraints, SelectedDependencies};
-use semver::Version;
 
 use crate::errors::SolverError;
 use crate::repository::Repository;
@@ -28,11 +27,7 @@ const LOGNAME: &str = "mqpkg::resolver";
 // Note: The name used here **MUST** be an invalid name for packages to have,
 //       if it's not, then our root package (which represents this stuff the
 //       used has asked for) will collide with a real package.
-const ROOT_NAME: &str = ":requested:";
-
-// Note: The actual version doesn't matter here. This is just a marker so that
-//       we can resolve the packages that the user has depended on.
-const ROOT_VER: (u64, u64, u64) = (0, 0, 0);
+const ROOT_NAME: &str = "requested packages";
 
 pub type DerivedResult = DerivationTree<PackageName, CandidateSet>;
 
@@ -105,7 +100,7 @@ impl Solver {
         callback: impl Fn(),
     ) -> Result<SolverSolution, SolverError> {
         let package = PackageName::new(ROOT_NAME);
-        let version = Candidate::new(Version::new(ROOT_VER.0, ROOT_VER.1, ROOT_VER.2));
+        let version = Candidate::root();
 
         let resolver = InternalSolver {
             repository: &self.repository,
@@ -153,12 +148,16 @@ impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r
         let (package, version) = choose_package_with_fewest_versions(
             |package| {
                 let versions = if package == &self.root {
-                    vec![Version::new(ROOT_VER.0, ROOT_VER.1, ROOT_VER.2)]
+                    vec![Candidate::root()]
                 } else {
-                    self.repository.versions(package)
+                    self.repository
+                        .versions(package)
+                        .into_iter()
+                        .map(Candidate::new)
+                        .collect()
                 };
 
-                if log_enabled!(log::Level::Trace) {
+                if log_enabled!(log::Level::Trace) && package != &self.root {
                     let versions_str: Vec<String> =
                         versions.iter().map(|v| v.to_string()).collect();
                     trace!(
@@ -169,7 +168,7 @@ impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r
                     );
                 }
 
-                versions.into_iter().map(Candidate::new)
+                versions.into_iter()
             },
             potential_packages,
         );
@@ -203,15 +202,20 @@ impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r
         };
 
         if log_enabled!(log::Level::Trace) {
+            let version = if package == &self.root {
+                "".to_string()
+            } else {
+                format!(" ({})", candidate)
+            };
             let req_str: Vec<String> = dependencies
                 .iter()
                 .map(|(k, v)| format!("{}({})", k, v))
                 .collect();
             trace!(
                 target: LOGNAME,
-                "found dependencies for {} ({}): [{}]",
+                "found dependencies for {}{}: [{}]",
                 package,
-                candidate.version,
+                version,
                 req_str.join(", ")
             );
         }
