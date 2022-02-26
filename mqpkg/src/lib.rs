@@ -27,10 +27,8 @@ mod pkgdb;
 mod repository;
 mod resolver;
 
-const NSTEPS: u8 = 2;
-
-static OFFICE_PAPER: Emoji<'_, '_> = Emoji("📄  ", "");
-static LOOKING_GLASS: Emoji<'_, '_> = Emoji("🔍  ", "");
+static OFFICE_PAPER: Emoji<'_, '_> = Emoji("📄 ", "");
+static LOOKING_GLASS: Emoji<'_, '_> = Emoji("🔍 ", "");
 
 type Result<T, E = InstallerError> = core::result::Result<T, E>;
 
@@ -93,8 +91,13 @@ impl<'p, T> Installer<'p, T> {
                 requested.insert(req.name.clone(), req.version.clone());
             }
 
+            // Grab our repository, and pre-emptively fetch all of the data
+            let repository = self.repository()?;
+            self.console(step(1, 2, OFFICE_PAPER, "Fetched package metadata"));
+
             // Resolve all of our requirements to a full set of packages that we should install
-            let _solution = self.resolve(requested)?;
+            let _solution = self.resolve(repository, requested)?;
+            self.console(step(2, 2, LOOKING_GLASS, "Resolved dependencies"));
         });
 
         Ok(())
@@ -108,26 +111,31 @@ impl<'p, T> Installer<'p, T> {
         }
     }
 
-    fn resolve(&self, requested: RequestedPackages) -> Result<SolverSolution> {
+    fn repository(&self) -> Result<Repository> {
         let bar = self
             .progress
             .bar(self.config.repositories().len().try_into().unwrap());
         let repository = Repository::new()?.fetch(self.config.repositories(), || bar.update(1))?;
         bar.finish();
 
-        self.console(step(1, OFFICE_PAPER, "Fetched package metadata"));
+        Ok(repository)
+    }
 
+    fn resolve(
+        &self,
+        repository: Repository,
+        requested: RequestedPackages,
+    ) -> Result<SolverSolution> {
         let spinner = self.progress.spinner("Resolving dependencies");
         let solver = Solver::new(repository);
         let solution = solver.resolve(requested, || spinner.update(1))?;
         spinner.finish();
-        self.console(step(2, LOOKING_GLASS, "Resolved dependencies"));
 
         Ok(solution)
     }
 }
 
-fn step(n: u8, emoji: Emoji, msg: &str) -> String {
-    let prefix = style(format!("[{n}/{NSTEPS}]")).bold().dim();
+fn step(n: u8, t: u8, emoji: Emoji, msg: &str) -> String {
+    let prefix = style(format!("[{n}/{t}]")).bold().dim();
     format!("{prefix} {emoji}{msg}")
 }
