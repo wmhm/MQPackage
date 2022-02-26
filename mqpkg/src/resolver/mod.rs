@@ -16,9 +16,7 @@ use pubgrub::type_aliases::{DependencyConstraints, SelectedDependencies};
 use crate::errors::SolverError;
 use crate::repository::Repository;
 use crate::resolver::candidates::CandidateSet;
-use crate::types::{PackageName, RequestedPackages};
-
-pub(crate) use crate::resolver::candidates::Candidate;
+use crate::types::{Candidate, PackageName, RequestedPackages};
 
 mod candidates;
 
@@ -147,19 +145,15 @@ impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r
     ) -> Result<(P, Option<Candidate>), Box<dyn std::error::Error>> {
         let (package, version) = choose_package_with_fewest_versions(
             |package| {
-                let versions = if package == &self.root {
+                let candidates = if package == &self.root {
                     vec![Candidate::root()]
                 } else {
-                    self.repository
-                        .versions(package)
-                        .into_iter()
-                        .map(Candidate::new)
-                        .collect()
+                    self.repository.candidates(package)
                 };
 
                 if log_enabled!(log::Level::Trace) && package != &self.root {
                     let versions_str: Vec<String> =
-                        versions.iter().map(|v| v.to_string()).collect();
+                        candidates.iter().map(|v| v.to_string()).collect();
                     trace!(
                         target: LOGNAME,
                         "found versions for {}: [{}]",
@@ -168,7 +162,7 @@ impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r
                     );
                 }
 
-                versions.into_iter()
+                candidates.into_iter()
             },
             potential_packages,
         );
@@ -198,7 +192,7 @@ impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r
         let dependencies = if package == &self.root {
             self.requested.clone()
         } else {
-            self.repository.dependencies(package, &candidate.version)
+            self.repository.dependencies(package, candidate.version())
         };
 
         if log_enabled!(log::Level::Trace) {

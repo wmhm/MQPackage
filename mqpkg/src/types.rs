@@ -3,13 +3,14 @@
 // for complete details.
 
 use std::clone::Clone;
+use std::cmp::Ordering;
 use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
 use std::str::FromStr;
 
-use semver::VersionReq;
+use semver::{Prerelease, Version, VersionReq};
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{PackageNameError, PackageSpecifierError};
@@ -82,3 +83,82 @@ impl FromStr for PackageSpecifier {
 }
 
 pub(crate) type RequestedPackages = HashMap<PackageName, VersionReq>;
+
+#[derive(Debug, Clone)]
+pub struct Candidate {
+    is_root: bool,
+    version: Version,
+}
+
+impl Candidate {
+    pub(crate) fn version(&self) -> &Version {
+        &self.version
+    }
+}
+
+impl PartialEq for Candidate {
+    fn eq(&self, other: &Self) -> bool {
+        self.version == other.version
+    }
+}
+impl Eq for Candidate {}
+
+impl Candidate {
+    pub(crate) fn new(version: Version) -> Candidate {
+        Candidate {
+            is_root: false,
+            version,
+        }
+    }
+
+    pub(crate) fn root() -> Candidate {
+        Candidate {
+            is_root: true,
+            version: Version::new(0, 0, 0),
+        }
+    }
+
+    pub(crate) fn from_parts(major: u64, minor: u64, patch: u64) -> Candidate {
+        Candidate {
+            is_root: false,
+            version: Version::new(major, minor, patch),
+        }
+    }
+
+    pub(crate) fn from_parts_pre(major: u64, minor: u64, patch: u64, pre: Prerelease) -> Candidate {
+        let mut version = Version::new(major, minor, patch);
+        version.pre = pre;
+
+        Candidate {
+            is_root: false,
+            version,
+        }
+    }
+}
+
+impl fmt::Display for Candidate {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Note: This relies on a hack where our root versions have an internal,
+        // otherwise ignored, marker that suppresses their fmt::Display output.
+        //
+        // This would be better handled by a custom reporter, but that can be
+        // done later.
+        if !self.is_root {
+            write!(f, "{}", self.version)?
+        }
+
+        Ok(())
+    }
+}
+
+impl Ord for Candidate {
+    fn cmp(&self, other: &Candidate) -> Ordering {
+        self.version.cmp(&other.version)
+    }
+}
+
+impl PartialOrd for Candidate {
+    fn partial_cmp(&self, other: &Candidate) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}

@@ -2,7 +2,7 @@
 // 2.0, and the BSD License. See the LICENSE file in the root of this repository
 // for complete details.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 
@@ -15,7 +15,7 @@ use url::Url;
 
 use crate::config;
 use crate::errors::RepositoryError;
-use crate::types::PackageName;
+use crate::types::{Candidate, PackageName};
 
 const LOGNAME: &str = "mqpkg::repository";
 
@@ -86,25 +86,27 @@ impl Repository {
         Ok(self)
     }
 
-    pub(crate) fn versions(&self, package: &PackageName) -> Vec<Version> {
-        let mut versions = Vec::<Version>::new();
-        let mut seen = HashSet::<Version>::new();
+    pub(crate) fn candidates(&self, package: &PackageName) -> Vec<Candidate> {
+        let mut candidates = Vec::<Candidate>::new();
 
+        // Because our underlying type of self.data is an IndexMap, this will ensure
+        // that our Vec is sorted by the order our repositories were defined in, however
+        // the list of versions within that is not sorted, so we'll need to resort
+        // the full list later.
         for data in self.data.values() {
             if let Some(packages) = data.packages.get(package) {
                 for version in packages.keys() {
-                    if seen.get(version).is_none() {
-                        seen.insert(version.clone());
-                        versions.push(version.clone());
-                    }
+                    candidates.push(Candidate::new(version.clone()));
                 }
             }
         }
 
         // We want to put the newest version first, this will make sure that our resolver
-        // will do intelligent things, like trying the newest version.
-        versions.sort_unstable_by(|l, r| l.cmp(r).reverse());
-        versions
+        // will do intelligent things, like trying the newest version. Since we ensured
+        // that this Vec was already sorted by repository, and we're using a stable sort
+        // this will put Version -> Repository.
+        candidates.sort_by(|l, r| l.cmp(r).reverse());
+        candidates
     }
 
     pub(crate) fn dependencies(
