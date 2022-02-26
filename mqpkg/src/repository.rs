@@ -93,12 +93,12 @@ impl Repository {
         // that our Vec is sorted by the order our repositories were defined in, however
         // the list of versions within that is not sorted, so we'll need to resort
         // the full list later.
-        for (repo, data) in self.data.iter() {
+        for (idx, (repo, data)) in self.data.iter().enumerate() {
             if let Some(packages) = data.packages.get(package) {
                 for (version, release) in packages.iter() {
                     candidates.push(
                         Candidate::new(version.clone(), release.dependencies.clone())
-                            .with_repository(repo.clone()),
+                            .with_repository(isize::try_from(idx).unwrap(), repo.clone()),
                     );
                 }
             }

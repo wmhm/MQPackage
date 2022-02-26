@@ -90,7 +90,7 @@ pub struct Candidate {
     is_root: bool,
     version: Version,
     dependencies: Option<HashMap<PackageName, VersionReq>>,
-    repository: Option<Repository>,
+    repository: Option<(isize, Repository)>,
 }
 
 impl Candidate {
@@ -134,7 +134,16 @@ impl Candidate {
 
 impl PartialEq for Candidate {
     fn eq(&self, other: &Self) -> bool {
-        self.version == other.version
+        if self.version.eq(&other.version) {
+            match (&self.repository, &other.repository) {
+                (Some((lidx, _)), Some((ridx, _))) => lidx.eq(ridx),
+                (Some(_), None) => false,
+                (None, Some(_)) => false,
+                (None, None) => true,
+            }
+        } else {
+            false
+        }
     }
 }
 impl Eq for Candidate {}
@@ -158,10 +167,10 @@ impl Candidate {
         }
     }
 
-    pub(crate) fn with_repository(&self, repo: Repository) -> Candidate {
+    pub(crate) fn with_repository(&self, idx: isize, repo: Repository) -> Candidate {
         let mut c = self.clone();
 
-        c.repository = Some(repo);
+        c.repository = Some((idx, repo));
         c
     }
 }
@@ -183,7 +192,16 @@ impl fmt::Display for Candidate {
 
 impl Ord for Candidate {
     fn cmp(&self, other: &Candidate) -> Ordering {
-        self.version.cmp(&other.version)
+        match self.version.cmp(&other.version) {
+            Ordering::Equal => match (&self.repository, &other.repository) {
+                (Some((lidx, _)), Some((ridx, _))) => ridx.cmp(lidx),
+                (Some(_), None) => Ordering::Greater,
+                (None, Some(_)) => Ordering::Less,
+                (None, None) => Ordering::Equal,
+            },
+            Ordering::Greater => Ordering::Greater,
+            Ordering::Less => Ordering::Less,
+        }
     }
 }
 
