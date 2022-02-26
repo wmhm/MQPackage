@@ -117,6 +117,23 @@ impl Solver {
         // module should generally need to be aware it even exists.
         result.remove(&package);
 
+        if log_enabled!(log::Level::Trace) {
+            let mut rpairs: Vec<(&PackageName, &Candidate)> = result.iter().collect();
+            rpairs.sort();
+            let results_str: Vec<String> = rpairs
+                .iter()
+                .map(|(p, c)| {
+                    let rid = c.repository_id();
+                    format!("{rid}:{p} ({c})")
+                })
+                .collect();
+            trace!(
+                target: LOGNAME,
+                "solution found: [{}]",
+                results_str.join(", ")
+            );
+        }
+
         Ok(result)
     }
 }
@@ -169,14 +186,20 @@ impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r
         );
 
         if log_enabled!(log::Level::Trace) {
+            let version = version
+                .clone()
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "None".to_string());
+            let version = if version.is_empty() {
+                "".to_string()
+            } else {
+                format!(" ({})", version)
+            };
             trace!(
                 target: LOGNAME,
-                "selected {} ({}) as next candidate",
+                "selected {}{} as next candidate",
                 package.borrow(),
                 version
-                    .clone()
-                    .map(|v| v.to_string())
-                    .unwrap_or_else(|| "None".to_string())
             );
         }
 

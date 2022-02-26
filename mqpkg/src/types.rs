@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::Repository;
 use crate::errors::{PackageNameError, PackageSpecifierError};
 
-#[derive(Serialize, Deserialize, Clone, Eq, Debug, Hash, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Eq, Debug, Hash, PartialEq, Ord, PartialOrd)]
 pub struct PackageName(String);
 
 impl PackageName {
@@ -90,12 +90,19 @@ pub struct Candidate {
     is_root: bool,
     version: Version,
     dependencies: Option<HashMap<PackageName, VersionReq>>,
-    repository: Option<(isize, Repository)>,
+    repository: Option<(usize, Repository)>,
 }
 
 impl Candidate {
     pub(crate) fn version(&self) -> &Version {
         &self.version
+    }
+
+    pub(crate) fn repository_id(&self) -> usize {
+        // This code will panic if someone calls repository_id without this Candidate
+        // having a repository, only internal to the resolver Candidates should not
+        // have a repository, so that should be fine.
+        self.repository.as_ref().unwrap().0
     }
 
     pub(crate) fn dependencies(&self) -> &HashMap<PackageName, VersionReq> {
@@ -167,7 +174,7 @@ impl Candidate {
         }
     }
 
-    pub(crate) fn with_repository(&self, idx: isize, repo: Repository) -> Candidate {
+    pub(crate) fn with_repository(&self, idx: usize, repo: Repository) -> Candidate {
         let mut c = self.clone();
 
         c.repository = Some((idx, repo));
