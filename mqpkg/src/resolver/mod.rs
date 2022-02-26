@@ -5,7 +5,7 @@
 use std::borrow::Borrow;
 use std::fmt;
 
-use log::{debug, info, log_enabled, trace};
+use log::{info, log_enabled, trace};
 use pubgrub::error::PubGrubError;
 use pubgrub::report::{DefaultStringReporter, DerivationTree, Reporter};
 use pubgrub::solver::{
@@ -117,7 +117,7 @@ impl Solver {
         // module should generally need to be aware it even exists.
         result.remove(&package);
 
-        if log_enabled!(log::Level::Debug) {
+        if log_enabled!(log::Level::Trace) {
             let mut rpairs: Vec<(&PackageName, &Candidate)> = result.iter().collect();
             rpairs.sort();
             let results_str: Vec<String> = rpairs
@@ -127,7 +127,7 @@ impl Solver {
                     format!("{rid}:{p} ({c})")
                 })
                 .collect();
-            debug!(
+            trace!(
                 target: LOGNAME,
                 "solution found: [{}]",
                 results_str.join(", ")
@@ -186,14 +186,20 @@ impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r
         );
 
         if log_enabled!(log::Level::Trace) {
+            let version = version
+                .clone()
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "None".to_string());
+            let version = if version.is_empty() {
+                "".to_string()
+            } else {
+                format!(" ({})", version)
+            };
             trace!(
                 target: LOGNAME,
-                "selected {} ({}) as next candidate",
+                "selected {}{} as next candidate",
                 package.borrow(),
                 version
-                    .clone()
-                    .map(|v| v.to_string())
-                    .unwrap_or_else(|| "None".to_string())
             );
         }
 
