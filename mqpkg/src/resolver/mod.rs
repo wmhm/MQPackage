@@ -117,6 +117,23 @@ impl Solver {
         // module should generally need to be aware it even exists.
         result.remove(&package);
 
+        if log_enabled!(log::Level::Trace) {
+            let mut rpairs: Vec<(&PackageName, &Candidate)> = result.iter().collect();
+            rpairs.sort();
+            let results_str: Vec<String> = rpairs
+                .iter()
+                .map(|(p, c)| {
+                    let rid = c.repository_id();
+                    format!("{rid}:{p} ({c})")
+                })
+                .collect();
+            trace!(
+                target: LOGNAME,
+                "solution found: [{}]",
+                results_str.join(", ")
+            );
+        }
+
         Ok(result)
     }
 }

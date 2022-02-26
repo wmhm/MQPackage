@@ -98,7 +98,7 @@ impl Repository {
                 for (version, release) in packages.iter() {
                     candidates.push(
                         Candidate::new(version.clone(), release.dependencies.clone())
-                            .with_repository(isize::try_from(idx).unwrap(), repo.clone()),
+                            .with_repository(idx, repo.clone()),
                     );
                 }
             }
