@@ -10,7 +10,7 @@ indexmap = "1.8.0"
 log = { version = "0.4", features = ["std"] }
 md5 = "0.7.0"
 named-lock = "0.1.1"
-pubgrub = "0.2.1"
+pubgrub = { git = "https://github.com/pubgrub-rs/pubgrub.git", rev ="7727938886fd3598f29cc2c8eb06921c121aaa9d" }
 reqwest = { version = "0.11.9", features = ["native-tls", "blocking", "gzip", "json"] }
 semver = { version = "1.0.5", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }

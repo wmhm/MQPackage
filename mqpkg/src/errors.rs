@@ -4,7 +4,8 @@
 
 use thiserror::Error;
 
-use crate::types::{DerivedResult, PackageName, Version};
+use crate::resolver::{Candidate, DerivedResult};
+use crate::types::PackageName;
 
 #[derive(Error, Debug)]
 pub enum InstallerError {
@@ -13,9 +14,6 @@ pub enum InstallerError {
 
     #[error(transparent)]
     RepositoryError(#[from] RepositoryError),
-
-    #[error(transparent)]
-    VersionError(#[from] VersionError),
 
     #[error("error attempting to resolve dependencies")]
     ResolverError(#[from] SolverError),
@@ -31,12 +29,6 @@ pub enum PackageNameError {
 
     #[error("names must contain only alphanumeric characters")]
     InvalidCharacter { name: String, character: String },
-}
-
-#[derive(Error, Debug)]
-pub enum VersionError {
-    #[error(transparent)]
-    ParseError(#[from] semver::Error),
 }
 
 #[derive(Error, Debug)]
@@ -112,7 +104,7 @@ pub enum SolverError {
         /// Package whose dependencies we want.
         package: PackageName,
         /// Version of the package for which we want the dependencies.
-        version: Version,
+        version: Candidate,
         /// The dependent package that requires us to pick from the empty set.
         dependent: PackageName,
     },
@@ -122,7 +114,7 @@ pub enum SolverError {
         /// Package whose dependencies we want.
         package: PackageName,
         /// Version of the package for which we want the dependencies.
-        version: Version,
+        version: Candidate,
     },
 
     // PubGrubError has a Failure error, and I'm not sure where it would actually

@@ -9,13 +9,13 @@ use std::io::BufReader;
 use indexmap::IndexMap;
 use log::info;
 use reqwest::blocking::Client as HTTPClient;
-use semver::VersionReq;
+use semver::{Version, VersionReq};
 use serde::Deserialize;
 use url::Url;
 
 use crate::config;
 use crate::errors::RepositoryError;
-use crate::types::{PackageName, Version};
+use crate::types::PackageName;
 
 const LOGNAME: &str = "mqpkg::repository";
 
