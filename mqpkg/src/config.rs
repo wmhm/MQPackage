@@ -19,7 +19,7 @@ const CONFIG_FILENAME: &str = "mqpkg.yml";
 
 type Result<T, E = ConfigError> = core::result::Result<T, E>;
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
 pub(crate) struct Repository {
     pub(crate) name: String,
     pub(crate) url: Url,

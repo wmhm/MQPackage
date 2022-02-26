@@ -13,6 +13,7 @@ use std::str::FromStr;
 use semver::{Prerelease, Version, VersionReq};
 use serde::{Deserialize, Serialize};
 
+use crate::config::Repository;
 use crate::errors::{PackageNameError, PackageSpecifierError};
 
 #[derive(Serialize, Deserialize, Clone, Eq, Debug, Hash, PartialEq)]
@@ -88,11 +89,16 @@ pub(crate) type RequestedPackages = HashMap<PackageName, VersionReq>;
 pub struct Candidate {
     is_root: bool,
     version: Version,
+    repository: Option<Repository>,
 }
 
 impl Candidate {
     pub(crate) fn version(&self) -> &Version {
         &self.version
+    }
+
+    pub(crate) fn repository(&self) -> Option<&Repository> {
+        self.repository.as_ref()
     }
 }
 
@@ -108,6 +114,7 @@ impl Candidate {
         Candidate {
             is_root: false,
             version,
+            repository: None,
         }
     }
 
@@ -115,6 +122,7 @@ impl Candidate {
         Candidate {
             is_root: true,
             version: Version::new(0, 0, 0),
+            repository: None,
         }
     }
 
@@ -122,6 +130,7 @@ impl Candidate {
         Candidate {
             is_root: false,
             version: Version::new(major, minor, patch),
+            repository: None,
         }
     }
 
@@ -132,7 +141,15 @@ impl Candidate {
         Candidate {
             is_root: false,
             version,
+            repository: None,
         }
+    }
+
+    pub(crate) fn with_repository(&self, repo: Repository) -> Candidate {
+        let mut c = self.clone();
+
+        c.repository = Some(repo);
+        c
     }
 }
 

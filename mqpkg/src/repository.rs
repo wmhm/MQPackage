@@ -47,13 +47,13 @@ struct RepoData {
 #[derive(Debug)]
 pub(crate) struct Repository {
     client: HTTPClient,
-    data: IndexMap<String, RepoData>,
+    data: IndexMap<config::Repository, RepoData>,
 }
 
 impl Repository {
     pub(crate) fn new() -> Result<Repository> {
         let client = HTTPClient::builder().gzip(true).build()?;
-        let data = IndexMap::<String, RepoData>::new();
+        let data = IndexMap::<config::Repository, RepoData>::new();
 
         Ok(Repository { client, data })
     }
@@ -79,7 +79,7 @@ impl Repository {
                     .error_for_status()?
                     .json()?,
             };
-            self.data.insert(repo.name.clone(), data);
+            self.data.insert(repo.clone(), data);
             (callback)();
         }
 
@@ -93,10 +93,10 @@ impl Repository {
         // that our Vec is sorted by the order our repositories were defined in, however
         // the list of versions within that is not sorted, so we'll need to resort
         // the full list later.
-        for data in self.data.values() {
+        for (repo, data) in self.data.iter() {
             if let Some(packages) = data.packages.get(package) {
                 for version in packages.keys() {
-                    candidates.push(Candidate::new(version.clone()));
+                    candidates.push(Candidate::new(version.clone()).with_repository(repo.clone()));
                 }
             }
         }
