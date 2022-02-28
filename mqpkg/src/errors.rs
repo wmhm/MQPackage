@@ -4,8 +4,8 @@
 
 use thiserror::Error;
 
-use crate::resolver::DerivedResult;
-use crate::types::{Candidate, PackageName};
+use crate::resolver::{Candidate, DerivedResult};
+use crate::types::PackageName;
 
 #[derive(Error, Debug)]
 pub enum InstallerError {

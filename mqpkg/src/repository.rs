@@ -15,7 +15,8 @@ use url::Url;
 
 use crate::config;
 use crate::errors::RepositoryError;
-use crate::types::{Candidate, PackageName};
+use crate::resolver::{Candidate, Dependencies, Requirement};
+use crate::types::PackageName;
 
 const LOGNAME: &str = "mqpkg::repository";
 
@@ -96,10 +97,11 @@ impl Repository {
         for (idx, (repo, data)) in self.data.iter().enumerate() {
             if let Some(packages) = data.packages.get(package) {
                 for (version, release) in packages.iter() {
-                    candidates.push(
-                        Candidate::new(version.clone(), release.dependencies.clone())
-                            .with_repository(idx, repo.clone()),
-                    );
+                    candidates.push(Candidate::new(
+                        version,
+                        u64::try_from(idx + 1).unwrap(),
+                        Box::new(RepositoryDependencies::new(release.dependencies.clone())),
+                    ));
                 }
             }
         }
@@ -110,5 +112,24 @@ impl Repository {
         // this will put Version -> Repository.
         candidates.sort_by(|l, r| l.cmp(r).reverse());
         candidates
+    }
+}
+
+#[derive(Debug, Clone)]
+struct RepositoryDependencies {
+    dependencies: HashMap<PackageName, Requirement>,
+}
+
+impl RepositoryDependencies {
+    fn new(reqs: HashMap<PackageName, VersionReq>) -> RepositoryDependencies {
+        RepositoryDependencies {
+            dependencies: reqs.iter().map(|(k, v)| (k.clone(), v.into())).collect(),
+        }
+    }
+}
+
+impl Dependencies for RepositoryDependencies {
+    fn get(&self) -> HashMap<PackageName, Requirement> {
+        self.dependencies.clone()
     }
 }

@@ -5,20 +5,23 @@
 use std::borrow::Borrow;
 use std::fmt;
 
-use log::{info, log_enabled, trace};
-use pubgrub::error::PubGrubError;
-use pubgrub::report::{DefaultStringReporter, DerivationTree, Reporter};
-use pubgrub::solver::{
-    choose_package_with_fewest_versions, resolve, Dependencies, DependencyProvider,
+use ::pubgrub::error::PubGrubError;
+use ::pubgrub::report::{DefaultStringReporter, DerivationTree, Reporter};
+use ::pubgrub::solver::{
+    choose_package_with_fewest_versions, resolve, Dependencies as PDependencies, DependencyProvider,
 };
-use pubgrub::type_aliases::{DependencyConstraints, SelectedDependencies};
+use ::pubgrub::type_aliases::{DependencyConstraints, SelectedDependencies};
+use log::{info, log_enabled, trace};
 
 use crate::errors::SolverError;
 use crate::repository::Repository;
-use crate::resolver::candidates::CandidateSet;
-use crate::types::{Candidate, PackageName, RequestedPackages};
+use crate::resolver::semver::VersionSet;
+use crate::types::{PackageName, RequestedPackages};
 
-mod candidates;
+pub(crate) use crate::resolver::semver::{Candidate, Dependencies, Requirement, WithDependencies};
+
+mod pubgrub;
+mod semver;
 
 const LOGNAME: &str = "mqpkg::resolver";
 
@@ -27,12 +30,12 @@ const LOGNAME: &str = "mqpkg::resolver";
 //       used has asked for) will collide with a real package.
 const ROOT_NAME: &str = "requested packages";
 
-pub type DerivedResult = DerivationTree<PackageName, CandidateSet>;
+pub type DerivedResult = DerivationTree<PackageName, VersionSet<Candidate>>;
 
 pub(crate) type SolverSolution = SelectedDependencies<PackageName, Candidate>;
 
 impl SolverError {
-    fn from_pubgrub(err: PubGrubError<PackageName, CandidateSet>) -> Self {
+    fn from_pubgrub(err: PubGrubError<PackageName, VersionSet<Candidate>>) -> Self {
         match err {
             PubGrubError::NoSolution(dt) => SolverError::NoSolution(Box::new(dt)),
             PubGrubError::DependencyOnTheEmptySet {
@@ -123,8 +126,8 @@ impl Solver {
             let results_str: Vec<String> = rpairs
                 .iter()
                 .map(|(p, c)| {
-                    let rid = c.repository_id();
-                    format!("{rid}:{p} ({c})")
+                    let sid = c.source_id();
+                    format!("{sid}:{p} ({c})")
                 })
                 .collect();
             trace!(
@@ -151,13 +154,13 @@ struct InternalSolver<'r, 'c> {
     callback: Box<dyn Fn() + 'c>,
 }
 
-impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r, 'c> {
+impl<'r, 'c> DependencyProvider<PackageName, VersionSet<Candidate>> for InternalSolver<'r, 'c> {
     fn should_cancel(&self) -> Result<(), Box<dyn std::error::Error>> {
         (self.callback)();
         Ok(())
     }
 
-    fn choose_package_version<P: Borrow<PackageName>, U: Borrow<CandidateSet>>(
+    fn choose_package_version<P: Borrow<PackageName>, U: Borrow<VersionSet<Candidate>>>(
         &self,
         potential_packages: impl Iterator<Item = (P, U)>,
     ) -> Result<(P, Option<Candidate>), Box<dyn std::error::Error>> {
@@ -210,7 +213,7 @@ impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r
         &self,
         package: &PackageName,
         candidate: &Candidate,
-    ) -> Result<Dependencies<PackageName, CandidateSet>, Box<dyn std::error::Error>> {
+    ) -> Result<PDependencies<PackageName, VersionSet<Candidate>>, Box<dyn std::error::Error>> {
         if log_enabled!(log::Level::Trace) {
             let version = if package == &self.root {
                 "".to_string()
@@ -219,6 +222,7 @@ impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r
             };
             let req_str: Vec<String> = candidate
                 .dependencies()
+                .get()
                 .iter()
                 .map(|(k, v)| format!("{}({})", k, v))
                 .collect();
@@ -231,11 +235,11 @@ impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r
             );
         }
 
-        let mut result = DependencyConstraints::<PackageName, CandidateSet>::default();
-        for (dep, req) in candidate.dependencies().iter() {
-            result.insert(dep.clone(), CandidateSet::req(req));
+        let mut result = DependencyConstraints::<PackageName, VersionSet<Candidate>>::default();
+        for (dep, req) in candidate.dependencies().get().iter() {
+            result.insert(dep.clone(), req.into());
         }
 
-        Ok(Dependencies::Known(result))
+        Ok(PDependencies::Known(result))
     }
 }
