@@ -148,6 +148,28 @@ struct InternalSolver<'r, 'c> {
     callback: Box<dyn Fn() + 'c>,
 }
 
+impl<'r, 'c> InternalSolver<'r, 'c> {
+    fn list_versions(&self, package: &PackageName) -> std::vec::IntoIter<Candidate> {
+        let candidates = if package == &self.root {
+            vec![Candidate::root(self.requested.clone())]
+        } else {
+            self.repository.candidates(package)
+        };
+
+        if log_enabled!(log::Level::Trace) && package != &self.root {
+            let versions_str: Vec<String> = candidates.iter().map(|v| v.to_string()).collect();
+            trace!(
+                target: LOGNAME,
+                "found versions for {}: [{}]",
+                package,
+                versions_str.join(", ")
+            );
+        }
+
+        candidates.into_iter()
+    }
+}
+
 impl<'r, 'c> DependencyProvider<PackageName, VersionSet<Candidate>> for InternalSolver<'r, 'c> {
     fn should_cancel(&self) -> Result<(), Box<dyn std::error::Error>> {
         (self.callback)();
@@ -158,29 +180,8 @@ impl<'r, 'c> DependencyProvider<PackageName, VersionSet<Candidate>> for Internal
         &self,
         potential_packages: impl Iterator<Item = (P, U)>,
     ) -> Result<(P, Option<Candidate>), Box<dyn std::error::Error>> {
-        let (package, version) = choose_package_with_fewest_versions(
-            |package| {
-                let candidates = if package == &self.root {
-                    vec![Candidate::root(self.requested.clone())]
-                } else {
-                    self.repository.candidates(package)
-                };
-
-                if log_enabled!(log::Level::Trace) && package != &self.root {
-                    let versions_str: Vec<String> =
-                        candidates.iter().map(|v| v.to_string()).collect();
-                    trace!(
-                        target: LOGNAME,
-                        "found versions for {}: [{}]",
-                        package,
-                        versions_str.join(", ")
-                    );
-                }
-
-                candidates.into_iter()
-            },
-            potential_packages,
-        );
+        let (package, version) =
+            choose_package_with_fewest_versions(|p| self.list_versions(p), potential_packages);
 
         if log_enabled!(log::Level::Trace) {
             let version = version
