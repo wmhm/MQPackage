@@ -15,10 +15,10 @@ use log::{info, log_enabled, trace};
 
 use crate::errors::SolverError;
 use crate::repository::Repository;
-use crate::resolver::semver::VersionSet;
+use crate::resolver::semver::{VersionSet, WithDependencies, WithSource};
 use crate::types::{PackageName, RequestedPackages};
 
-pub(crate) use crate::resolver::semver::{Candidate, Dependencies, Requirement, WithDependencies};
+pub(crate) use crate::resolver::semver::{Candidate, Dependencies, Requirement, Source};
 
 mod pubgrub;
 mod semver;
@@ -126,8 +126,9 @@ impl Solver {
             let results_str: Vec<String> = rpairs
                 .iter()
                 .map(|(p, c)| {
-                    let sid = c.source_id();
-                    format!("{sid}:{p} ({c})")
+                    let sid = c.source().id();
+                    let sd = c.source().discriminator();
+                    format!("{sid}:{sd}:{p} ({c})")
                 })
                 .collect();
             trace!(

@@ -43,10 +43,42 @@ pub(crate) trait WithDependencies {
     fn dependencies(&self) -> &dyn Dependencies;
 }
 
+pub(crate) trait Source: fmt::Debug + DynClone {
+    fn id(&self) -> u64;
+
+    fn discriminator(&self) -> u64;
+}
+
+dyn_clone::clone_trait_object!(Source);
+
+#[derive(Debug, Clone)]
+struct InternalSource(u64);
+
+impl InternalSource {
+    fn new(id: u64) -> InternalSource {
+        InternalSource(id)
+    }
+}
+
+impl Source for InternalSource {
+    fn id(&self) -> u64 {
+        0
+    }
+
+    fn discriminator(&self) -> u64 {
+        self.0
+    }
+}
+
+pub(super) trait WithSource {
+    fn source(&self) -> &dyn Source;
+}
+
 #[derive(Debug, Clone)]
 pub struct Version {
     version: SemVer,
     source_id: u64,
+    source_discriminator: u64,
 }
 
 impl Version {
@@ -54,6 +86,7 @@ impl Version {
         Version {
             version: SemVer::new(major, minor, patch),
             source_id: 0,
+            source_discriminator: 0,
         }
     }
 
@@ -70,6 +103,11 @@ impl Version {
         self.source_id = source_id;
         self
     }
+
+    fn with_source_discriminator(mut self, source_discriminator: u64) -> Version {
+        self.source_discriminator = source_discriminator;
+        self
+    }
 }
 
 impl fmt::Display for Version {
@@ -80,11 +118,8 @@ impl fmt::Display for Version {
 
 impl PartialEq for Version {
     fn eq(&self, other: &Self) -> bool {
-        if self.version.eq(&other.version) {
-            self.source_id == other.source_id
-        } else {
-            false
-        }
+        (&self.version, self.source_id, self.source_discriminator)
+            == (&other.version, other.source_id, other.source_discriminator)
     }
 }
 impl Eq for Version {}
@@ -92,7 +127,9 @@ impl Eq for Version {}
 impl Ord for Version {
     fn cmp(&self, other: &Self) -> Ordering {
         match self.version.cmp(&other.version) {
-            Ordering::Equal => self.source_id.cmp(&other.source_id).reverse(),
+            Ordering::Equal => (self.source_id, self.source_discriminator)
+                .cmp(&(other.source_id, other.source_discriminator))
+                .reverse(),
             Ordering::Greater => Ordering::Greater,
             Ordering::Less => Ordering::Less,
         }
@@ -131,6 +168,7 @@ impl From<&SemVer> for Version {
         Version {
             version: version.clone(),
             source_id: 0,
+            source_discriminator: 0,
         }
     }
 }
@@ -159,27 +197,30 @@ impl From<&VersionReq> for Requirement {
 #[derive(Debug, Clone)]
 pub struct Candidate {
     version: Version,
-    source_id: u64,
+    source: Box<dyn Source + Sync + Send>,
     dependencies: Box<dyn Dependencies + Sync + Send>,
 }
 
 impl Candidate {
     pub(crate) fn new<V: Into<Version>>(
         version: V,
-        source_id: u64,
-        deps: Box<dyn Dependencies + Sync + Send>,
+        source: Box<dyn Source + Sync + Send>,
+        dependencies: Box<dyn Dependencies + Sync + Send>,
     ) -> Candidate {
         Candidate {
-            version: version.into().with_source_id(source_id),
-            source_id,
-            dependencies: deps,
+            version: version
+                .into()
+                .with_source_id(source.id())
+                .with_source_discriminator(source.discriminator()),
+            source,
+            dependencies,
         }
     }
 
     pub(super) fn root(reqs: RequestedPackages) -> Candidate {
         Candidate {
             version: Version::candidate(0, 0, 0),
-            source_id: 0,
+            source: Box::new(InternalSource::new(0)),
             dependencies: Box::new(StaticDependencies::new(
                 reqs.iter()
                     .map(|(k, v)| (k.clone(), Requirement(v.clone())))
@@ -187,15 +228,17 @@ impl Candidate {
             )),
         }
     }
-
-    pub(super) fn source_id(&self) -> u64 {
-        self.source_id
-    }
 }
 
 impl WithDependencies for Candidate {
     fn dependencies(&self) -> &dyn Dependencies {
         &*self.dependencies
+    }
+}
+
+impl WithSource for Candidate {
+    fn source(&self) -> &dyn Source {
+        &*self.source
     }
 }
 

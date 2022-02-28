@@ -15,7 +15,7 @@ use url::Url;
 
 use crate::config;
 use crate::errors::RepositoryError;
-use crate::resolver::{Candidate, Dependencies, Requirement};
+use crate::resolver::{Candidate, Dependencies, Requirement, Source};
 use crate::types::PackageName;
 
 const LOGNAME: &str = "mqpkg::repository";
@@ -94,12 +94,12 @@ impl Repository {
         // that our Vec is sorted by the order our repositories were defined in, however
         // the list of versions within that is not sorted, so we'll need to resort
         // the full list later.
-        for (idx, (repo, data)) in self.data.iter().enumerate() {
+        for (idx, (_repo, data)) in self.data.iter().enumerate() {
             if let Some(packages) = data.packages.get(package) {
                 for (version, release) in packages.iter() {
                     candidates.push(Candidate::new(
                         version,
-                        u64::try_from(idx + 1).unwrap(),
+                        Box::new(RepositorySource::new(u64::try_from(idx + 1).unwrap())),
                         Box::new(RepositoryDependencies::new(release.dependencies.clone())),
                     ));
                 }
@@ -131,5 +131,26 @@ impl RepositoryDependencies {
 impl Dependencies for RepositoryDependencies {
     fn get(&self) -> HashMap<PackageName, Requirement> {
         self.dependencies.clone()
+    }
+}
+
+#[derive(Debug, Clone)]
+struct RepositorySource {
+    repository_id: u64,
+}
+
+impl RepositorySource {
+    fn new(repository_id: u64) -> RepositorySource {
+        RepositorySource { repository_id }
+    }
+}
+
+impl Source for RepositorySource {
+    fn id(&self) -> u64 {
+        100
+    }
+
+    fn discriminator(&self) -> u64 {
+        self.repository_id
     }
 }
