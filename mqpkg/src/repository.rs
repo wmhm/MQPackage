@@ -3,6 +3,7 @@
 // for complete details.
 
 use std::collections::HashMap;
+use std::fmt;
 use std::fs::File;
 use std::io::BufReader;
 
@@ -94,12 +95,15 @@ impl Repository {
         // that our Vec is sorted by the order our repositories were defined in, however
         // the list of versions within that is not sorted, so we'll need to resort
         // the full list later.
-        for (idx, (_repo, data)) in self.data.iter().enumerate() {
+        for (idx, (repo, data)) in self.data.iter().enumerate() {
             if let Some(packages) = data.packages.get(package) {
                 for (version, release) in packages.iter() {
                     candidates.push(Candidate::new(
                         version,
-                        Box::new(RepositorySource::new(u64::try_from(idx + 1).unwrap())),
+                        Box::new(RepositorySource::new(
+                            u64::try_from(idx + 1).unwrap(),
+                            repo.clone(),
+                        )),
                         Box::new(RepositoryDependencies::new(release.dependencies.clone())),
                     ));
                 }
@@ -137,11 +141,26 @@ impl Dependencies for RepositoryDependencies {
 #[derive(Debug, Clone)]
 struct RepositorySource {
     repository_id: u64,
+    repository: config::Repository,
 }
 
 impl RepositorySource {
-    fn new(repository_id: u64) -> RepositorySource {
-        RepositorySource { repository_id }
+    fn new(repository_id: u64, repository: config::Repository) -> RepositorySource {
+        RepositorySource {
+            repository_id,
+            repository,
+        }
+    }
+}
+
+impl fmt::Display for RepositorySource {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let identifier = if !self.repository.name.is_empty() {
+            self.repository.name.as_str()
+        } else {
+            self.repository.url.as_str()
+        };
+        write!(f, "Repository({})", identifier)
     }
 }
 

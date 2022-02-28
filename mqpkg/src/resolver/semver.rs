@@ -43,7 +43,7 @@ pub(crate) trait WithDependencies {
     fn dependencies(&self) -> &dyn Dependencies;
 }
 
-pub(crate) trait Source: fmt::Debug + DynClone {
+pub(crate) trait Source: fmt::Debug + fmt::Display + DynClone {
     fn id(&self) -> u64;
 
     fn discriminator(&self) -> u64;
@@ -57,6 +57,12 @@ struct InternalSource(u64);
 impl InternalSource {
     fn new(id: u64) -> InternalSource {
         InternalSource(id)
+    }
+}
+
+impl fmt::Display for InternalSource {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Internal")
     }
 }
 

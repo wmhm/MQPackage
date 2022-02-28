@@ -15,6 +15,7 @@ use log::{info, log_enabled, trace};
 
 use crate::errors::SolverError;
 use crate::repository::Repository;
+use crate::resolver::pubgrub::Candidate as CandidateTrait;
 use crate::resolver::semver::{VersionSet, WithDependencies, WithSource};
 use crate::types::{PackageName, RequestedPackages};
 
@@ -121,21 +122,18 @@ impl Solver {
         result.remove(&package);
 
         if log_enabled!(log::Level::Trace) {
-            let mut rpairs: Vec<(&PackageName, &Candidate)> = result.iter().collect();
-            rpairs.sort();
-            let results_str: Vec<String> = rpairs
-                .iter()
-                .map(|(p, c)| {
-                    let sid = c.source().id();
-                    let sd = c.source().discriminator();
-                    format!("{sid}:{sd}:{p} ({c})")
-                })
-                .collect();
-            trace!(
-                target: LOGNAME,
-                "solution found: [{}]",
-                results_str.join(", ")
-            );
+            let mut pkgs: Vec<(&PackageName, &Candidate)> = result.iter().collect();
+            pkgs.sort();
+
+            trace!(target: LOGNAME, "solution found");
+            for (pkg, cand) in pkgs.iter() {
+                let cv = cand.version();
+                let source = cand.source();
+                trace!(
+                    target: LOGNAME,
+                    "solution selected {pkg} at {cv} from {source}"
+                );
+            }
         }
 
         Ok(result)
