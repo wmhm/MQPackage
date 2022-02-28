@@ -160,7 +160,7 @@ impl fmt::Display for RepositorySource {
         } else {
             self.repository.url.as_str()
         };
-        write!(f, "Repository({})", identifier)
+        write!(f, "Repository(id={}, {})", self.repository_id, identifier)
     }
 }
 
