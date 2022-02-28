@@ -16,8 +16,8 @@ use url::Url;
 
 use crate::config;
 use crate::errors::RepositoryError;
-use crate::resolver::{Candidate, Dependencies, Requirement, Source};
-use crate::types::PackageName;
+use crate::resolver::{Candidate, Dependencies, Requirement};
+use crate::types::{PackageName, Source};
 
 const LOGNAME: &str = "mqpkg::repository";
 

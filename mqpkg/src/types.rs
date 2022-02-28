@@ -4,12 +4,13 @@
 
 use std::clone::Clone;
 use std::cmp::{Eq, PartialEq};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::hash::Hash;
 use std::str::FromStr;
 
-use semver::VersionReq;
+use dyn_clone::DynClone;
+use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
 
 use crate::errors::{PackageNameError, PackageSpecifierError};
@@ -82,3 +83,56 @@ impl FromStr for PackageSpecifier {
 }
 
 pub(crate) type RequestedPackages = HashMap<PackageName, VersionReq>;
+
+pub(crate) type Packages = BTreeMap<PackageName, Package>;
+
+pub(crate) trait Source: fmt::Debug + fmt::Display + DynClone + Sync + Send {
+    fn id(&self) -> u64;
+
+    fn discriminator(&self) -> u64;
+}
+
+dyn_clone::clone_trait_object!(Source);
+
+pub(crate) trait WithSource {
+    #[allow(clippy::borrowed_box)]
+    fn source(&self) -> &Box<dyn Source>;
+}
+
+pub(crate) struct Package {
+    name: PackageName,
+    version: Version,
+    source: Box<dyn Source>,
+}
+
+impl Package {
+    pub(crate) fn new<P: Into<PackageName>, V: Into<Version>>(
+        name: P,
+        version: V,
+        source: Box<dyn Source>,
+    ) -> Package {
+        Package {
+            name: name.into(),
+            version: version.into(),
+            source,
+        }
+    }
+}
+
+impl WithSource for Package {
+    fn source(&self) -> &Box<dyn Source> {
+        &self.source
+    }
+}
+
+impl fmt::Display for Package {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{} at {} from {}",
+            self.name,
+            self.version,
+            self.source()
+        )
+    }
+}

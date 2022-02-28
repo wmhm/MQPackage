@@ -12,7 +12,7 @@ use dyn_clone::DynClone;
 use semver::{Prerelease, Version as SemVer, VersionReq};
 
 use crate::resolver::pubgrub;
-use crate::types::{PackageName, RequestedPackages};
+use crate::types::{PackageName, RequestedPackages, Source, WithSource};
 
 pub(super) use super::pubgrub::VersionSet;
 
@@ -43,14 +43,6 @@ pub(crate) trait WithDependencies {
     fn dependencies(&self) -> &dyn Dependencies;
 }
 
-pub(crate) trait Source: fmt::Debug + fmt::Display + DynClone {
-    fn id(&self) -> u64;
-
-    fn discriminator(&self) -> u64;
-}
-
-dyn_clone::clone_trait_object!(Source);
-
 #[derive(Debug, Clone)]
 struct InternalSource(u64);
 
@@ -74,10 +66,6 @@ impl Source for InternalSource {
     fn discriminator(&self) -> u64 {
         self.0
     }
-}
-
-pub(super) trait WithSource {
-    fn source(&self) -> &dyn Source;
 }
 
 #[derive(Debug, Clone)]
@@ -179,6 +167,12 @@ impl From<&SemVer> for Version {
     }
 }
 
+impl From<&Version> for SemVer {
+    fn from(version: &Version) -> SemVer {
+        version.version.clone()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct Requirement(VersionReq);
 
@@ -203,14 +197,14 @@ impl From<&VersionReq> for Requirement {
 #[derive(Debug, Clone)]
 pub struct Candidate {
     version: Version,
-    source: Box<dyn Source + Sync + Send>,
+    source: Box<dyn Source>,
     dependencies: Box<dyn Dependencies + Sync + Send>,
 }
 
 impl Candidate {
     pub(crate) fn new<V: Into<Version>>(
         version: V,
-        source: Box<dyn Source + Sync + Send>,
+        source: Box<dyn Source>,
         dependencies: Box<dyn Dependencies + Sync + Send>,
     ) -> Candidate {
         Candidate {
@@ -243,8 +237,8 @@ impl WithDependencies for Candidate {
 }
 
 impl WithSource for Candidate {
-    fn source(&self) -> &dyn Source {
-        &*self.source
+    fn source(&self) -> &Box<dyn Source> {
+        &self.source
     }
 }
 

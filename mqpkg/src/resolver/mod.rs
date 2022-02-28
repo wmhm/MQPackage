@@ -10,16 +10,16 @@ use ::pubgrub::report::{DefaultStringReporter, DerivationTree, Reporter};
 use ::pubgrub::solver::{
     choose_package_with_fewest_versions, resolve, Dependencies as PDependencies, DependencyProvider,
 };
-use ::pubgrub::type_aliases::{DependencyConstraints, SelectedDependencies};
+use ::pubgrub::type_aliases::DependencyConstraints;
 use log::{info, log_enabled, trace};
 
 use crate::errors::SolverError;
 use crate::repository::Repository;
 use crate::resolver::pubgrub::Candidate as CandidateTrait;
-use crate::resolver::semver::{VersionSet, WithDependencies, WithSource};
-use crate::types::{PackageName, RequestedPackages};
+use crate::resolver::semver::{VersionSet, WithDependencies};
+use crate::types::{Package, PackageName, Packages, RequestedPackages, WithSource};
 
-pub(crate) use crate::resolver::semver::{Candidate, Dependencies, Requirement, Source};
+pub(crate) use crate::resolver::semver::{Candidate, Dependencies, Requirement};
 
 mod pubgrub;
 mod semver;
@@ -32,8 +32,6 @@ const LOGNAME: &str = "mqpkg::resolver";
 const ROOT_NAME: &str = "requested packages";
 
 pub type DerivedResult = DerivationTree<PackageName, VersionSet<Candidate>>;
-
-pub(crate) type SolverSolution = SelectedDependencies<PackageName, Candidate>;
 
 impl SolverError {
     fn from_pubgrub(err: PubGrubError<PackageName, VersionSet<Candidate>>) -> Self {
@@ -101,7 +99,7 @@ impl Solver {
         &self,
         reqs: RequestedPackages,
         callback: impl Fn(),
-    ) -> Result<SolverSolution, SolverError> {
+    ) -> Result<Packages, SolverError> {
         let package = PackageName::new(ROOT_NAME);
         let version = Candidate::root(reqs.clone());
 
@@ -121,22 +119,19 @@ impl Solver {
         // module should generally need to be aware it even exists.
         result.remove(&package);
 
-        if log_enabled!(log::Level::Trace) {
-            let mut pkgs: Vec<(&PackageName, &Candidate)> = result.iter().collect();
-            pkgs.sort();
+        let packages: Packages = result
+            .into_iter()
+            .map(|(p, c)| (p.clone(), Package::new(p, c.version(), c.source().clone())))
+            .collect();
 
+        if log_enabled!(log::Level::Trace) {
             trace!(target: LOGNAME, "solution found");
-            for (pkg, cand) in pkgs.iter() {
-                let cv = cand.version();
-                let source = cand.source();
-                trace!(
-                    target: LOGNAME,
-                    "solution selected {pkg} at {cv} from {source}"
-                );
+            for pkg in packages.values() {
+                trace!(target: LOGNAME, "solution package: {pkg}");
             }
         }
 
-        Ok(result)
+        Ok(packages)
     }
 }
 
