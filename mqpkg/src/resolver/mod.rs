@@ -60,6 +60,10 @@ impl Name {
             root: true,
         }
     }
+
+    fn is_root(&self) -> bool {
+        !self.root
+    }
 }
 
 impl fmt::Display for Name {
@@ -146,7 +150,6 @@ impl Solver {
 
         let resolver = InternalSolver {
             repository: &self.repository,
-            root: package.clone(),
             requested: reqs,
             callback: Box::new(callback),
         };
@@ -189,20 +192,19 @@ impl Solver {
 // as a reference.
 struct InternalSolver<'r, 'c> {
     repository: &'r Repository,
-    root: Name,
     requested: RequestedPackages,
     callback: Box<dyn Fn() + 'c>,
 }
 
 impl<'r, 'c> InternalSolver<'r, 'c> {
     fn list_versions(&self, package: &Name) -> std::vec::IntoIter<Candidate> {
-        let candidates = if package == &self.root {
+        let candidates = if package.is_root() {
             vec![Candidate::root(self.requested.clone())]
         } else {
             self.repository.candidates(&package.name)
         };
 
-        if log_enabled!(log::Level::Trace) && package != &self.root {
+        if log_enabled!(log::Level::Trace) && !package.is_root() {
             let versions_str: Vec<String> = candidates.iter().map(|v| v.to_string()).collect();
             trace!(
                 target: LOGNAME,
@@ -256,7 +258,7 @@ impl<'r, 'c> DependencyProvider<Name, VersionSet<Candidate>> for InternalSolver<
         candidate: &Candidate,
     ) -> Result<PDependencies<Name, VersionSet<Candidate>>, Box<dyn std::error::Error>> {
         if log_enabled!(log::Level::Trace) {
-            let version = if package == &self.root {
+            let version = if package.is_root() {
                 "".to_string()
             } else {
                 format!(" ({})", candidate)
