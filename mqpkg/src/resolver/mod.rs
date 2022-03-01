@@ -31,10 +31,51 @@ const LOGNAME: &str = "mqpkg::resolver";
 //       used has asked for) will collide with a real package.
 const ROOT_NAME: &str = "requested packages";
 
-pub type DerivedResult = DerivationTree<PackageName, VersionSet<Candidate>>;
+pub type DerivedResult = DerivationTree<Name, VersionSet<Candidate>>;
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub struct Name {
+    root: bool,
+
+    // For reasons I have yet to figure out, putting name not last breaks
+    // resolving with pubgrub due to the derived hash implementation not
+    // hashing it last.
+    //
+    // Why does pubgrub break in strange ways if this isn't hashed last?,
+    // It is a mystery! Maybe some day I'll file a bug if I can ever get
+    // a minimal reproducer and/or the versionset branch lands and I can
+    // reproduce it with an actual release.
+    name: PackageName,
+}
+
+impl Name {
+    fn new(name: PackageName) -> Name {
+        assert!(name.to_string() != ROOT_NAME);
+        Name { name, root: false }
+    }
+
+    fn root() -> Name {
+        Name {
+            name: PackageName::new(ROOT_NAME),
+            root: true,
+        }
+    }
+}
+
+impl fmt::Display for Name {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
+
+impl From<PackageName> for Name {
+    fn from(pn: PackageName) -> Name {
+        Name::new(pn)
+    }
+}
 
 impl SolverError {
-    fn from_pubgrub(err: PubGrubError<PackageName, VersionSet<Candidate>>) -> Self {
+    fn from_pubgrub(err: PubGrubError<Name, VersionSet<Candidate>>) -> Self {
         match err {
             PubGrubError::NoSolution(dt) => SolverError::NoSolution(Box::new(dt)),
             PubGrubError::DependencyOnTheEmptySet {
@@ -42,12 +83,12 @@ impl SolverError {
                 version,
                 dependent,
             } => SolverError::DependencyOnTheEmptySet {
-                package,
+                package: package.name,
                 version: Box::new(version),
-                dependent,
+                dependent: dependent.name,
             },
             PubGrubError::SelfDependency { package, version } => SolverError::SelfDependency {
-                package,
+                package: package.name,
                 version: Box::new(version),
             },
             PubGrubError::Failure(s) => SolverError::Failure(s),
@@ -100,7 +141,7 @@ impl Solver {
         reqs: RequestedPackages,
         callback: impl Fn(),
     ) -> Result<Packages, SolverError> {
-        let package = PackageName::new(ROOT_NAME);
+        let package = Name::root();
         let version = Candidate::root(reqs.clone());
 
         let resolver = InternalSolver {
@@ -121,7 +162,12 @@ impl Solver {
 
         let packages: Packages = result
             .into_iter()
-            .map(|(p, c)| (p.clone(), Package::new(p, c.version(), c.source().clone())))
+            .map(|(p, c)| {
+                (
+                    p.clone().name,
+                    Package::new(p.name, c.version(), c.source().clone()),
+                )
+            })
             .collect();
 
         if log_enabled!(log::Level::Trace) {
@@ -143,17 +189,17 @@ impl Solver {
 // as a reference.
 struct InternalSolver<'r, 'c> {
     repository: &'r Repository,
-    root: PackageName,
+    root: Name,
     requested: RequestedPackages,
     callback: Box<dyn Fn() + 'c>,
 }
 
 impl<'r, 'c> InternalSolver<'r, 'c> {
-    fn list_versions(&self, package: &PackageName) -> std::vec::IntoIter<Candidate> {
+    fn list_versions(&self, package: &Name) -> std::vec::IntoIter<Candidate> {
         let candidates = if package == &self.root {
             vec![Candidate::root(self.requested.clone())]
         } else {
-            self.repository.candidates(package)
+            self.repository.candidates(&package.name)
         };
 
         if log_enabled!(log::Level::Trace) && package != &self.root {
@@ -170,13 +216,13 @@ impl<'r, 'c> InternalSolver<'r, 'c> {
     }
 }
 
-impl<'r, 'c> DependencyProvider<PackageName, VersionSet<Candidate>> for InternalSolver<'r, 'c> {
+impl<'r, 'c> DependencyProvider<Name, VersionSet<Candidate>> for InternalSolver<'r, 'c> {
     fn should_cancel(&self) -> Result<(), Box<dyn std::error::Error>> {
         (self.callback)();
         Ok(())
     }
 
-    fn choose_package_version<P: Borrow<PackageName>, U: Borrow<VersionSet<Candidate>>>(
+    fn choose_package_version<P: Borrow<Name>, U: Borrow<VersionSet<Candidate>>>(
         &self,
         potential_packages: impl Iterator<Item = (P, U)>,
     ) -> Result<(P, Option<Candidate>), Box<dyn std::error::Error>> {
@@ -206,9 +252,9 @@ impl<'r, 'c> DependencyProvider<PackageName, VersionSet<Candidate>> for Internal
 
     fn get_dependencies(
         &self,
-        package: &PackageName,
+        package: &Name,
         candidate: &Candidate,
-    ) -> Result<PDependencies<PackageName, VersionSet<Candidate>>, Box<dyn std::error::Error>> {
+    ) -> Result<PDependencies<Name, VersionSet<Candidate>>, Box<dyn std::error::Error>> {
         if log_enabled!(log::Level::Trace) {
             let version = if package == &self.root {
                 "".to_string()
@@ -230,7 +276,7 @@ impl<'r, 'c> DependencyProvider<PackageName, VersionSet<Candidate>> for Internal
             );
         }
 
-        let mut result = DependencyConstraints::<PackageName, VersionSet<Candidate>>::default();
+        let mut result = DependencyConstraints::<Name, VersionSet<Candidate>>::default();
         for (dep, req) in candidate.dependencies().get().iter() {
             result.insert(dep.clone(), req.into());
         }

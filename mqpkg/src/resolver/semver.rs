@@ -12,29 +12,35 @@ use dyn_clone::DynClone;
 use semver::{Prerelease, Version as SemVer, VersionReq};
 
 use crate::resolver::pubgrub;
-use crate::types::{PackageName, RequestedPackages, Source, WithSource};
+use crate::resolver::Name;
+use crate::types::{RequestedPackages, Source, WithSource};
 
 pub(super) use super::pubgrub::VersionSet;
 
 pub(crate) trait Dependencies: fmt::Debug + DynClone {
-    fn get(&self) -> HashMap<PackageName, Requirement>;
+    fn get(&self) -> HashMap<Name, Requirement>;
 }
 
 dyn_clone::clone_trait_object!(Dependencies);
 
 #[derive(Debug, Clone)]
 struct StaticDependencies {
-    dependencies: HashMap<PackageName, Requirement>,
+    dependencies: HashMap<Name, Requirement>,
 }
 
 impl StaticDependencies {
-    fn new(dependencies: HashMap<PackageName, Requirement>) -> StaticDependencies {
-        StaticDependencies { dependencies }
+    fn new<N: Into<Name>>(dependencies: HashMap<N, Requirement>) -> StaticDependencies {
+        StaticDependencies {
+            dependencies: dependencies
+                .into_iter()
+                .map(|(p, r)| (p.into(), r))
+                .collect(),
+        }
     }
 }
 
 impl Dependencies for StaticDependencies {
-    fn get(&self) -> HashMap<PackageName, Requirement> {
+    fn get(&self) -> HashMap<Name, Requirement> {
         self.dependencies.clone()
     }
 }
@@ -188,9 +194,9 @@ impl fmt::Display for Requirement {
     }
 }
 
-impl From<&VersionReq> for Requirement {
-    fn from(req: &VersionReq) -> Requirement {
-        Requirement::new(req.clone())
+impl From<VersionReq> for Requirement {
+    fn from(req: VersionReq) -> Requirement {
+        Requirement::new(req)
     }
 }
 
