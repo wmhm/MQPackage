@@ -4,7 +4,7 @@
 
 use std::clone::Clone;
 use std::cmp::{Eq, PartialEq};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::fmt;
 use std::hash::Hash;
 use std::str::FromStr;
@@ -81,8 +81,6 @@ impl FromStr for PackageSpecifier {
         Ok(PackageSpecifier { name, version })
     }
 }
-
-pub(crate) type RequestedPackages = HashMap<PackageName, VersionReq>;
 
 pub(crate) type Packages = BTreeMap<PackageName, Package>;
 

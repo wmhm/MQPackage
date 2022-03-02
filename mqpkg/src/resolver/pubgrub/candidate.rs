@@ -3,11 +3,14 @@
 // for complete details.
 
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::fmt;
 
 use crate::resolver::pubgrub::versionset::Candidate as CandidateTrait;
-use crate::resolver::types::{Dependencies, StaticDependencies, Version, WithDependencies};
-use crate::types::{RequestedPackages, Source, WithSource};
+use crate::resolver::types::{
+    Dependencies, Name, Requirement, StaticDependencies, Version, WithDependencies,
+};
+use crate::types::{Source, WithSource};
 
 #[derive(Debug, Clone)]
 struct InternalSource(u64);
@@ -57,13 +60,15 @@ impl Candidate {
         }
     }
 
-    pub(in crate::resolver) fn root(reqs: RequestedPackages) -> Candidate {
+    pub(in crate::resolver) fn root<N: Into<Name>, R: Into<Requirement>>(
+        reqs: HashMap<N, R>,
+    ) -> Candidate {
         Candidate {
             version: Version::candidate(0, 0, 0),
             source: Box::new(InternalSource::new(0)),
             dependencies: Box::new(StaticDependencies::new(
                 reqs.into_iter()
-                    // .map(|(k, v)| (k.clone(), v.into()))
+                    .map(|(k, v)| (k.into(), v.into()))
                     .collect(),
             )),
         }

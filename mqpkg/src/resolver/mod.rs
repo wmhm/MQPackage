@@ -3,6 +3,7 @@
 // for complete details.
 
 use std::borrow::Borrow;
+use std::collections::HashMap;
 use std::fmt;
 
 use ::pubgrub::error::PubGrubError;
@@ -19,7 +20,7 @@ pub(crate) use crate::resolver::pubgrub::{Candidate, DerivedResult};
 use crate::resolver::pubgrub::{CandidateTrait, VersionSet};
 use crate::resolver::types::WithDependencies;
 pub(crate) use crate::resolver::types::{Dependencies, Name, Requirement};
-use crate::types::{Package, Packages, RequestedPackages, WithSource};
+use crate::types::{Package, Packages, WithSource};
 
 mod pubgrub;
 mod types;
@@ -88,9 +89,9 @@ impl Solver {
         Solver { repository }
     }
 
-    pub(crate) fn resolve(
+    pub(crate) fn resolve<N: Into<Name> + Clone, R: Into<Requirement> + Clone>(
         &self,
-        reqs: RequestedPackages,
+        reqs: HashMap<N, R>,
         callback: impl Fn(),
     ) -> Result<Packages, SolverError> {
         let package = Name::root();
@@ -98,7 +99,10 @@ impl Solver {
 
         let resolver = InternalSolver {
             repository: &self.repository,
-            requested: reqs,
+            requested: reqs
+                .into_iter()
+                .map(|(p, r)| (p.into(), r.into()))
+                .collect(),
             callback: Box::new(callback),
         };
 
@@ -140,7 +144,7 @@ impl Solver {
 // as a reference.
 struct InternalSolver<'r, 'c> {
     repository: &'r Repository,
-    requested: RequestedPackages,
+    requested: HashMap<Name, Requirement>,
     callback: Box<dyn Fn() + 'c>,
 }
 

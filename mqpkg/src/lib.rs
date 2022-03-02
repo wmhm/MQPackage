@@ -6,13 +6,14 @@ use std::clone::Clone;
 use std::collections::HashMap;
 
 use console::{style, Emoji};
+use semver::VersionReq;
 use vfs::VfsPath;
 
 use crate::pkgdb::transaction;
 use crate::progress::Progress;
 use crate::repository::Repository;
 use crate::resolver::Solver;
-use crate::types::{Packages, RequestedPackages};
+use crate::types::{PackageName, Packages};
 
 pub use crate::config::Config;
 pub use crate::errors::{InstallerError, SolverError};
@@ -121,7 +122,11 @@ impl<'p, T> Installer<'p, T> {
         Ok(repository)
     }
 
-    fn resolve(&self, repository: Repository, requested: RequestedPackages) -> Result<Packages> {
+    fn resolve(
+        &self,
+        repository: Repository,
+        requested: HashMap<PackageName, VersionReq>,
+    ) -> Result<Packages> {
         let spinner = self.progress.spinner("Resolving dependencies");
         let solver = Solver::new(repository);
         let solution = solver.resolve(requested, || spinner.update(1))?;
