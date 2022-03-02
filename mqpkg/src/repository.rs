@@ -3,6 +3,7 @@
 // for complete details.
 
 use std::collections::HashMap;
+use std::fmt;
 use std::fs::File;
 use std::io::BufReader;
 
@@ -15,7 +16,8 @@ use url::Url;
 
 use crate::config;
 use crate::errors::RepositoryError;
-use crate::types::{Candidate, PackageName};
+use crate::resolver::{Candidate, StaticDependencies};
+use crate::types::{PackageName, Source};
 
 const LOGNAME: &str = "mqpkg::repository";
 
@@ -86,7 +88,7 @@ impl Repository {
         Ok(self)
     }
 
-    pub(crate) fn candidates(&self, package: &PackageName) -> Vec<Candidate> {
+    pub(crate) fn candidates<P: AsRef<PackageName>>(&self, package: P) -> Vec<Candidate> {
         let mut candidates = Vec::<Candidate>::new();
 
         // Because our underlying type of self.data is an IndexMap, this will ensure
@@ -94,12 +96,16 @@ impl Repository {
         // the list of versions within that is not sorted, so we'll need to resort
         // the full list later.
         for (idx, (repo, data)) in self.data.iter().enumerate() {
-            if let Some(packages) = data.packages.get(package) {
+            if let Some(packages) = data.packages.get(package.as_ref()) {
                 for (version, release) in packages.iter() {
-                    candidates.push(
-                        Candidate::new(version.clone(), release.dependencies.clone())
-                            .with_repository(idx, repo.clone()),
-                    );
+                    candidates.push(Candidate::new(
+                        version,
+                        Box::new(RepositorySource::new(
+                            u64::try_from(idx).unwrap(),
+                            repo.clone(),
+                        )),
+                        Box::new(StaticDependencies::new(release.dependencies.clone())),
+                    ));
                 }
             }
         }
@@ -110,5 +116,41 @@ impl Repository {
         // this will put Version -> Repository.
         candidates.sort_by(|l, r| l.cmp(r).reverse());
         candidates
+    }
+}
+
+#[derive(Debug, Clone)]
+struct RepositorySource {
+    repository_id: u64,
+    repository: config::Repository,
+}
+
+impl RepositorySource {
+    fn new(repository_id: u64, repository: config::Repository) -> RepositorySource {
+        RepositorySource {
+            repository_id,
+            repository,
+        }
+    }
+}
+
+impl fmt::Display for RepositorySource {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let identifier = if !self.repository.name.is_empty() {
+            self.repository.name.as_str()
+        } else {
+            self.repository.url.as_str()
+        };
+        write!(f, "Repository(id={}, {})", self.repository_id, identifier)
+    }
+}
+
+impl Source for RepositorySource {
+    fn id(&self) -> u64 {
+        100
+    }
+
+    fn discriminator(&self) -> u64 {
+        self.repository_id
     }
 }

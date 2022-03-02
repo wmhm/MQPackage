@@ -3,86 +3,28 @@
 // for complete details.
 
 use std::borrow::Borrow;
+use std::collections::HashMap;
 use std::fmt;
 
-use log::{info, log_enabled, trace};
-use pubgrub::error::PubGrubError;
-use pubgrub::report::{DefaultStringReporter, DerivationTree, Reporter};
-use pubgrub::solver::{
-    choose_package_with_fewest_versions, resolve, Dependencies, DependencyProvider,
+use ::pubgrub::solver::{
+    choose_package_with_fewest_versions, resolve, Dependencies as PDependencies, DependencyProvider,
 };
-use pubgrub::type_aliases::{DependencyConstraints, SelectedDependencies};
+use ::pubgrub::type_aliases::DependencyConstraints;
+use log::{info, log_enabled, trace};
 
 use crate::errors::SolverError;
 use crate::repository::Repository;
-use crate::resolver::candidates::CandidateSet;
-use crate::types::{Candidate, PackageName, RequestedPackages};
+pub(crate) use crate::resolver::pubgrub::{Candidate, DerivedResult};
+use crate::resolver::pubgrub::{CandidateTrait, VersionSet};
+use crate::resolver::types::WithDependencies;
+pub(crate) use crate::resolver::types::{Name, Requirement, StaticDependencies};
+use crate::types::{Package, Packages, WithSource};
 
-mod candidates;
+mod errors;
+mod pubgrub;
+mod types;
 
 const LOGNAME: &str = "mqpkg::resolver";
-
-// Note: The name used here **MUST** be an invalid name for packages to have,
-//       if it's not, then our root package (which represents this stuff the
-//       used has asked for) will collide with a real package.
-const ROOT_NAME: &str = "requested packages";
-
-pub type DerivedResult = DerivationTree<PackageName, CandidateSet>;
-
-pub(crate) type SolverSolution = SelectedDependencies<PackageName, Candidate>;
-
-impl SolverError {
-    fn from_pubgrub(err: PubGrubError<PackageName, CandidateSet>) -> Self {
-        match err {
-            PubGrubError::NoSolution(dt) => SolverError::NoSolution(Box::new(dt)),
-            PubGrubError::DependencyOnTheEmptySet {
-                package,
-                version,
-                dependent,
-            } => SolverError::DependencyOnTheEmptySet {
-                package,
-                version: Box::new(version),
-                dependent,
-            },
-            PubGrubError::SelfDependency { package, version } => SolverError::SelfDependency {
-                package,
-                version: Box::new(version),
-            },
-            PubGrubError::Failure(s) => SolverError::Failure(s),
-            PubGrubError::ErrorRetrievingDependencies { .. } => SolverError::Impossible,
-            PubGrubError::ErrorChoosingPackageVersion(_) => SolverError::Impossible,
-            PubGrubError::ErrorInShouldCancel(_) => SolverError::Impossible,
-        }
-    }
-
-    pub fn humanized<S: Into<String>>(msg: S, dt: DerivedResult) -> HumanizedNoSolutionError {
-        HumanizedNoSolutionError {
-            msg: msg.into(),
-            dt,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct HumanizedNoSolutionError {
-    msg: String,
-    dt: DerivedResult,
-}
-
-impl fmt::Display for HumanizedNoSolutionError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}\n\n", self.msg.as_str())?;
-        writeln!(f, "{}", DefaultStringReporter::report(&self.dt))?;
-
-        Ok(())
-    }
-}
-
-impl std::error::Error for HumanizedNoSolutionError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
-    }
-}
 
 pub(crate) struct Solver {
     repository: Repository,
@@ -93,48 +35,48 @@ impl Solver {
         Solver { repository }
     }
 
-    pub(crate) fn resolve(
+    pub(crate) fn resolve<N: Into<Name> + Clone, R: Into<Requirement> + Clone>(
         &self,
-        reqs: RequestedPackages,
+        reqs: HashMap<N, R>,
         callback: impl Fn(),
-    ) -> Result<SolverSolution, SolverError> {
-        let package = PackageName::new(ROOT_NAME);
+    ) -> Result<Packages, SolverError> {
+        let package = Name::root();
         let version = Candidate::root(reqs.clone());
 
         let resolver = InternalSolver {
             repository: &self.repository,
-            root: package.clone(),
-            requested: reqs,
+            requested: reqs
+                .into_iter()
+                .map(|(p, r)| (p.into(), r.into()))
+                .collect(),
             callback: Box::new(callback),
         };
 
         info!(target: LOGNAME, "resolving requested packages");
 
-        let mut result =
-            resolve(&resolver, package.clone(), version).map_err(SolverError::from_pubgrub)?;
-
-        // Just remove our fake "root" package from our solution, since nothing but this
-        // module should generally need to be aware it even exists.
-        result.remove(&package);
+        let result = resolve(&resolver, package, version).map_err(SolverError::from_pubgrub)?;
+        let packages: Packages = result
+            .into_iter()
+            // Filter out the root package from our results since nothing but this
+            // module should even be aware it exists.
+            .filter(|(p, _)| !p.is_root())
+            // Turn our (Name, Candidate) into (PackageName, Package)
+            .map(|(p, c)| {
+                (
+                    p.clone().into(),
+                    Package::new(p, c.version(), c.source().clone()),
+                )
+            })
+            .collect();
 
         if log_enabled!(log::Level::Trace) {
-            let mut rpairs: Vec<(&PackageName, &Candidate)> = result.iter().collect();
-            rpairs.sort();
-            let results_str: Vec<String> = rpairs
-                .iter()
-                .map(|(p, c)| {
-                    let rid = c.repository_id();
-                    format!("{rid}:{p} ({c})")
-                })
-                .collect();
-            trace!(
-                target: LOGNAME,
-                "solution found: [{}]",
-                results_str.join(", ")
-            );
+            trace!(target: LOGNAME, "solution found");
+            for pkg in packages.values() {
+                trace!(target: LOGNAME, "solution package: {pkg}");
+            }
         }
 
-        Ok(result)
+        Ok(packages)
     }
 }
 
@@ -146,60 +88,55 @@ impl Solver {
 // as a reference.
 struct InternalSolver<'r, 'c> {
     repository: &'r Repository,
-    root: PackageName,
-    requested: RequestedPackages,
+    requested: HashMap<Name, Requirement>,
     callback: Box<dyn Fn() + 'c>,
 }
 
-impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r, 'c> {
+impl<'r, 'c> InternalSolver<'r, 'c> {
+    fn list_versions(&self, package: &Name) -> std::vec::IntoIter<Candidate> {
+        let candidates = if package.is_root() {
+            vec![Candidate::root(self.requested.clone())]
+        } else {
+            self.repository.candidates(package)
+        };
+
+        if log_enabled!(log::Level::Trace) && !package.is_root() {
+            let versions_str: Vec<String> = candidates.iter().map(|v| v.to_string()).collect();
+            trace!(
+                target: LOGNAME,
+                "found versions for {}: [{}]",
+                package,
+                versions_str.join(", ")
+            );
+        }
+
+        candidates.into_iter()
+    }
+}
+
+impl<'r, 'c> DependencyProvider<Name, VersionSet<Candidate>> for InternalSolver<'r, 'c> {
     fn should_cancel(&self) -> Result<(), Box<dyn std::error::Error>> {
         (self.callback)();
         Ok(())
     }
 
-    fn choose_package_version<P: Borrow<PackageName>, U: Borrow<CandidateSet>>(
+    fn choose_package_version<P: Borrow<Name>, U: Borrow<VersionSet<Candidate>>>(
         &self,
         potential_packages: impl Iterator<Item = (P, U)>,
     ) -> Result<(P, Option<Candidate>), Box<dyn std::error::Error>> {
-        let (package, version) = choose_package_with_fewest_versions(
-            |package| {
-                let candidates = if package == &self.root {
-                    vec![Candidate::root(self.requested.clone())]
-                } else {
-                    self.repository.candidates(package)
-                };
-
-                if log_enabled!(log::Level::Trace) && package != &self.root {
-                    let versions_str: Vec<String> =
-                        candidates.iter().map(|v| v.to_string()).collect();
-                    trace!(
-                        target: LOGNAME,
-                        "found versions for {}: [{}]",
-                        package,
-                        versions_str.join(", ")
-                    );
-                }
-
-                candidates.into_iter()
-            },
-            potential_packages,
-        );
+        let (package, version) =
+            choose_package_with_fewest_versions(|p| self.list_versions(p), potential_packages);
 
         if log_enabled!(log::Level::Trace) {
             let version = version
                 .clone()
                 .map(|v| v.to_string())
                 .unwrap_or_else(|| "None".to_string());
-            let version = if version.is_empty() {
-                "".to_string()
-            } else {
-                format!(" ({})", version)
-            };
             trace!(
                 target: LOGNAME,
                 "selected {}{} as next candidate",
                 package.borrow(),
-                version
+                version_str(&version, version.is_empty())
             );
         }
 
@@ -208,34 +145,45 @@ impl<'r, 'c> DependencyProvider<PackageName, CandidateSet> for InternalSolver<'r
 
     fn get_dependencies(
         &self,
-        package: &PackageName,
+        package: &Name,
         candidate: &Candidate,
-    ) -> Result<Dependencies<PackageName, CandidateSet>, Box<dyn std::error::Error>> {
-        if log_enabled!(log::Level::Trace) {
-            let version = if package == &self.root {
-                "".to_string()
-            } else {
-                format!(" ({})", candidate)
-            };
-            let req_str: Vec<String> = candidate
-                .dependencies()
-                .iter()
-                .map(|(k, v)| format!("{}({})", k, v))
-                .collect();
-            trace!(
-                target: LOGNAME,
-                "found dependencies for {}{}: [{}]",
-                package,
-                version,
-                req_str.join(", ")
-            );
-        }
+    ) -> Result<PDependencies<Name, VersionSet<Candidate>>, Box<dyn std::error::Error>> {
+        match candidate.dependencies().get() {
+            None => {
+                trace!(
+                    target: LOGNAME,
+                    "could not determine dependencies for {package}"
+                );
 
-        let mut result = DependencyConstraints::<PackageName, CandidateSet>::default();
-        for (dep, req) in candidate.dependencies().iter() {
-            result.insert(dep.clone(), CandidateSet::req(req));
-        }
+                Ok(PDependencies::Unknown)
+            }
+            Some(deps) => {
+                if log_enabled!(log::Level::Trace) {
+                    let req_str: Vec<String> =
+                        deps.iter().map(|(k, v)| format!("{}({})", k, v)).collect();
+                    trace!(
+                        target: LOGNAME,
+                        "found dependencies for {}{}: [{}]",
+                        package,
+                        version_str(candidate, package.is_root()),
+                        req_str.join(", ")
+                    );
+                }
 
-        Ok(Dependencies::Known(result))
+                let mut result = DependencyConstraints::<Name, VersionSet<Candidate>>::default();
+                for (dep, req) in deps.iter() {
+                    result.insert(dep.clone(), req.into());
+                }
+                Ok(PDependencies::Known(result))
+            }
+        }
+    }
+}
+
+fn version_str<V: fmt::Display>(version: &V, should_display: bool) -> String {
+    if should_display {
+        format!(" ({})", version)
+    } else {
+        "".to_string()
     }
 }
