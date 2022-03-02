@@ -6,7 +6,7 @@ use std::borrow::Borrow;
 use std::fmt;
 
 use ::pubgrub::error::PubGrubError;
-use ::pubgrub::report::{DefaultStringReporter, DerivationTree, Reporter};
+use ::pubgrub::report::{DefaultStringReporter, Reporter};
 use ::pubgrub::solver::{
     choose_package_with_fewest_versions, resolve, Dependencies as PDependencies, DependencyProvider,
 };
@@ -15,7 +15,7 @@ use log::{info, log_enabled, trace};
 
 use crate::errors::SolverError;
 use crate::repository::Repository;
-pub(crate) use crate::resolver::pubgrub::Candidate;
+pub(crate) use crate::resolver::pubgrub::{Candidate, DerivedResult};
 use crate::resolver::pubgrub::{CandidateTrait, VersionSet};
 use crate::resolver::types::WithDependencies;
 pub(crate) use crate::resolver::types::{Dependencies, Name, Requirement};
@@ -25,8 +25,6 @@ mod pubgrub;
 mod types;
 
 const LOGNAME: &str = "mqpkg::resolver";
-
-pub type DerivedResult = DerivationTree<Name, VersionSet<Candidate>>;
 
 impl SolverError {
     fn from_pubgrub(err: PubGrubError<Name, VersionSet<Candidate>>) -> Self {

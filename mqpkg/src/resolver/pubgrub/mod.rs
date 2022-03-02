@@ -3,9 +3,11 @@
 // for complete details.
 
 pub(crate) use crate::resolver::pubgrub::candidate::Candidate;
+pub(crate) use crate::resolver::pubgrub::types::DerivedResult;
 pub(super) use crate::resolver::pubgrub::versionset::{
     Candidate as CandidateTrait, CandidateVersion, VersionSet,
 };
 
 mod candidate;
+mod types;
 mod versionset;
