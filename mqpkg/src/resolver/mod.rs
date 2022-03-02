@@ -186,16 +186,11 @@ impl<'r, 'c> DependencyProvider<Name, VersionSet<Candidate>> for InternalSolver<
                 .clone()
                 .map(|v| v.to_string())
                 .unwrap_or_else(|| "None".to_string());
-            let version = if version.is_empty() {
-                "".to_string()
-            } else {
-                format!(" ({})", version)
-            };
             trace!(
                 target: LOGNAME,
                 "selected {}{} as next candidate",
                 package.borrow(),
-                version
+                version_str(&version, version.is_empty())
             );
         }
 
@@ -207,32 +202,42 @@ impl<'r, 'c> DependencyProvider<Name, VersionSet<Candidate>> for InternalSolver<
         package: &Name,
         candidate: &Candidate,
     ) -> Result<PDependencies<Name, VersionSet<Candidate>>, Box<dyn std::error::Error>> {
-        if log_enabled!(log::Level::Trace) {
-            let version = if package.is_root() {
-                "".to_string()
-            } else {
-                format!(" ({})", candidate)
-            };
-            let req_str: Vec<String> = candidate
-                .dependencies()
-                .get()
-                .iter()
-                .map(|(k, v)| format!("{}({})", k, v))
-                .collect();
-            trace!(
-                target: LOGNAME,
-                "found dependencies for {}{}: [{}]",
-                package,
-                version,
-                req_str.join(", ")
-            );
-        }
+        match candidate.dependencies().get() {
+            None => {
+                trace!(
+                    target: LOGNAME,
+                    "could not determine dependencies for {package}"
+                );
 
-        let mut result = DependencyConstraints::<Name, VersionSet<Candidate>>::default();
-        for (dep, req) in candidate.dependencies().get().iter() {
-            result.insert(dep.clone(), req.into());
-        }
+                Ok(PDependencies::Unknown)
+            }
+            Some(deps) => {
+                if log_enabled!(log::Level::Trace) {
+                    let req_str: Vec<String> =
+                        deps.iter().map(|(k, v)| format!("{}({})", k, v)).collect();
+                    trace!(
+                        target: LOGNAME,
+                        "found dependencies for {}{}: [{}]",
+                        package,
+                        version_str(candidate, package.is_root()),
+                        req_str.join(", ")
+                    );
+                }
 
-        Ok(PDependencies::Known(result))
+                let mut result = DependencyConstraints::<Name, VersionSet<Candidate>>::default();
+                for (dep, req) in deps.iter() {
+                    result.insert(dep.clone(), req.into());
+                }
+                Ok(PDependencies::Known(result))
+            }
+        }
+    }
+}
+
+fn version_str<V: fmt::Display>(version: &V, should_display: bool) -> String {
+    if should_display {
+        format!(" ({})", version)
+    } else {
+        "".to_string()
     }
 }

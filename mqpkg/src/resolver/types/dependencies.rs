@@ -11,7 +11,7 @@ use crate::resolver::types::name::Name;
 use crate::resolver::types::requirement::Requirement;
 
 pub(crate) trait Dependencies: fmt::Debug + DynClone {
-    fn get(&self) -> HashMap<Name, Requirement>;
+    fn get(&self) -> Option<HashMap<Name, Requirement>>;
 }
 
 dyn_clone::clone_trait_object!(Dependencies);
@@ -39,7 +39,7 @@ impl StaticDependencies {
 }
 
 impl Dependencies for StaticDependencies {
-    fn get(&self) -> HashMap<Name, Requirement> {
-        self.dependencies.clone()
+    fn get(&self) -> Option<HashMap<Name, Requirement>> {
+        Some(self.dependencies.clone())
     }
 }
