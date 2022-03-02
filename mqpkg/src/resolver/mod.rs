@@ -94,11 +94,13 @@ struct InternalSolver<'r, 'c> {
 
 impl<'r, 'c> InternalSolver<'r, 'c> {
     fn list_versions(&self, package: &Name) -> std::vec::IntoIter<Candidate> {
-        let candidates = if package.is_root() {
+        let mut candidates = if package.is_root() {
             vec![Candidate::root(self.requested.clone())]
         } else {
             self.repository.candidates(package)
         };
+
+        candidates.sort_by(|l, r| l.cmp(r).reverse());
 
         if log_enabled!(log::Level::Trace) && !package.is_root() {
             let versions_str: Vec<String> = candidates.iter().map(|v| v.to_string()).collect();
