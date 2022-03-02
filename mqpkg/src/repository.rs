@@ -101,7 +101,7 @@ impl Repository {
                     candidates.push(Candidate::new(
                         version,
                         Box::new(RepositorySource::new(
-                            u64::try_from(idx + 1).unwrap(),
+                            u64::try_from(idx).unwrap(),
                             repo.clone(),
                         )),
                         Box::new(StaticDependencies::new(release.dependencies.clone())),
