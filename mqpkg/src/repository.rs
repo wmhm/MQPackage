@@ -88,7 +88,7 @@ impl Repository {
         Ok(self)
     }
 
-    pub(crate) fn candidates(&self, package: &PackageName) -> Vec<Candidate> {
+    pub(crate) fn candidates<P: AsRef<PackageName>>(&self, package: P) -> Vec<Candidate> {
         let mut candidates = Vec::<Candidate>::new();
 
         // Because our underlying type of self.data is an IndexMap, this will ensure
@@ -96,7 +96,7 @@ impl Repository {
         // the list of versions within that is not sorted, so we'll need to resort
         // the full list later.
         for (idx, (repo, data)) in self.data.iter().enumerate() {
-            if let Some(packages) = data.packages.get(package) {
+            if let Some(packages) = data.packages.get(package.as_ref()) {
                 for (version, release) in packages.iter() {
                     candidates.push(Candidate::new(
                         version,

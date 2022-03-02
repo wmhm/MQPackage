@@ -15,68 +15,18 @@ use log::{info, log_enabled, trace};
 
 use crate::errors::SolverError;
 use crate::repository::Repository;
-use crate::resolver::pubgrub::Candidate as CandidateTrait;
-use crate::resolver::semver::{VersionSet, WithDependencies};
-use crate::types::{Package, PackageName, Packages, RequestedPackages, WithSource};
-
-pub(crate) use crate::resolver::semver::{Candidate, Dependencies, Requirement};
+pub(crate) use crate::resolver::pubgrub::Candidate;
+use crate::resolver::pubgrub::{CandidateTrait, VersionSet};
+use crate::resolver::types::WithDependencies;
+pub(crate) use crate::resolver::types::{Dependencies, Name, Requirement};
+use crate::types::{Package, Packages, RequestedPackages, WithSource};
 
 mod pubgrub;
-mod semver;
+mod types;
 
 const LOGNAME: &str = "mqpkg::resolver";
 
-// Note: The name used here **MUST** be an invalid name for packages to have,
-//       if it's not, then our root package (which represents this stuff the
-//       used has asked for) will collide with a real package.
-const ROOT_NAME: &str = "requested packages";
-
 pub type DerivedResult = DerivationTree<Name, VersionSet<Candidate>>;
-
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub struct Name {
-    root: bool,
-
-    // For reasons I have yet to figure out, putting name not last breaks
-    // resolving with pubgrub due to the derived hash implementation not
-    // hashing it last.
-    //
-    // Why does pubgrub break in strange ways if this isn't hashed last?,
-    // It is a mystery! Maybe some day I'll file a bug if I can ever get
-    // a minimal reproducer and/or the versionset branch lands and I can
-    // reproduce it with an actual release.
-    name: PackageName,
-}
-
-impl Name {
-    fn new(name: PackageName) -> Name {
-        assert!(name.to_string() != ROOT_NAME);
-        Name { name, root: false }
-    }
-
-    fn root() -> Name {
-        Name {
-            name: PackageName::new(ROOT_NAME),
-            root: true,
-        }
-    }
-
-    fn is_root(&self) -> bool {
-        !self.root
-    }
-}
-
-impl fmt::Display for Name {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.name)
-    }
-}
-
-impl From<PackageName> for Name {
-    fn from(pn: PackageName) -> Name {
-        Name::new(pn)
-    }
-}
 
 impl SolverError {
     fn from_pubgrub(err: PubGrubError<Name, VersionSet<Candidate>>) -> Self {
@@ -87,12 +37,12 @@ impl SolverError {
                 version,
                 dependent,
             } => SolverError::DependencyOnTheEmptySet {
-                package: package.name,
+                package: package.into(),
                 version: Box::new(version),
-                dependent: dependent.name,
+                dependent: dependent.into(),
             },
             PubGrubError::SelfDependency { package, version } => SolverError::SelfDependency {
-                package: package.name,
+                package: package.into(),
                 version: Box::new(version),
             },
             PubGrubError::Failure(s) => SolverError::Failure(s),
@@ -167,8 +117,8 @@ impl Solver {
             .into_iter()
             .map(|(p, c)| {
                 (
-                    p.clone().name,
-                    Package::new(p.name, c.version(), c.source().clone()),
+                    p.clone().into(),
+                    Package::new(p, c.version(), c.source().clone()),
                 )
             })
             .collect();
@@ -201,7 +151,7 @@ impl<'r, 'c> InternalSolver<'r, 'c> {
         let candidates = if package.is_root() {
             vec![Candidate::root(self.requested.clone())]
         } else {
-            self.repository.candidates(&package.name)
+            self.repository.candidates(package)
         };
 
         if log_enabled!(log::Level::Trace) && !package.is_root() {

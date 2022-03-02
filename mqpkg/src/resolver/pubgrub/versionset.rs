@@ -4,16 +4,14 @@
 
 use std::fmt;
 
-use ::pubgrub::{
-    range::Range, version::Version as PubGrubVersion, version_set::VersionSet as PubGrubVersionSet,
-};
+use pubgrub::{range::Range, version::Version, version_set::VersionSet as BaseVersionSet};
 
-pub trait Version: PubGrubVersion {
+pub trait CandidateVersion: Version {
     fn is_prerelease(&self) -> bool;
 }
 
 pub trait Candidate: fmt::Debug + fmt::Display + Clone + Eq + Ord {
-    type V: Version;
+    type V: CandidateVersion;
 
     fn version(&self) -> &Self::V;
 }
@@ -30,7 +28,7 @@ impl<C: Candidate> fmt::Display for VersionSet<C> {
     }
 }
 
-impl<C: Candidate> PubGrubVersionSet for VersionSet<C> {
+impl<C: Candidate> BaseVersionSet for VersionSet<C> {
     type V = C;
 
     fn empty() -> VersionSet<C> {
@@ -104,55 +102,59 @@ impl<C: Candidate> PubGrubVersionSet for VersionSet<C> {
         if !c.version().is_prerelease() {
             self.range.contains(c.version())
         } else {
-            self.pre.contains(c.version())
+            // Since we're going to use only pre when checking against
+            // a pre-release, we still need to compute the intersection
+            // of what we would normally allow, against our union of
+            // of explicitly mentioned pre-releases.
+            self.range.intersection(&self.pre).contains(c.version())
         }
     }
 }
 
 impl<C: Candidate> VersionSet<C> {
-    pub(super) fn default() -> VersionSet<C> {
+    pub(in crate::resolver) fn default() -> VersionSet<C> {
         VersionSet {
             range: Range::any(),
             pre: Range::none(),
         }
     }
 
-    pub(super) fn exact(v: C::V) -> VersionSet<C> {
+    pub(in crate::resolver) fn exact(v: C::V) -> VersionSet<C> {
         VersionSet {
             range: Range::exact(v.clone()),
             pre: Range::exact(v),
         }
     }
 
-    pub(super) fn between(left: C::V, right: C::V) -> VersionSet<C> {
+    pub(in crate::resolver) fn between(left: C::V, right: C::V) -> VersionSet<C> {
         VersionSet {
             range: Range::between(left.clone(), right.clone()),
             pre: Range::between(left, right),
         }
     }
 
-    pub(super) fn higher_than(v: C::V) -> VersionSet<C> {
+    pub(in crate::resolver) fn higher_than(v: C::V) -> VersionSet<C> {
         VersionSet {
             range: Range::higher_than(v.clone()),
             pre: Range::higher_than(v),
         }
     }
 
-    pub(super) fn strictly_lower_than(v: C::V) -> VersionSet<C> {
+    pub(in crate::resolver) fn strictly_lower_than(v: C::V) -> VersionSet<C> {
         VersionSet {
             range: Range::strictly_lower_than(v.clone()),
             pre: Range::strictly_lower_than(v),
         }
     }
 
-    pub(super) fn with_normal(&self, other: &VersionSet<C>) -> VersionSet<C> {
+    pub(in crate::resolver) fn with_normal(&self, other: &VersionSet<C>) -> VersionSet<C> {
         VersionSet {
             range: self.range.intersection(&other.range),
             pre: self.pre.clone(),
         }
     }
 
-    pub(super) fn with_pre(&self, other: &VersionSet<C>) -> VersionSet<C> {
+    pub(in crate::resolver) fn with_pre(&self, other: &VersionSet<C>) -> VersionSet<C> {
         VersionSet {
             range: self.range.clone(),
             pre: self.pre.union(&other.pre),
