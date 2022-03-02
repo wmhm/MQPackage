@@ -108,15 +108,13 @@ impl Solver {
 
         info!(target: LOGNAME, "resolving requested packages");
 
-        let mut result =
-            resolve(&resolver, package.clone(), version).map_err(SolverError::from_pubgrub)?;
-
-        // Just remove our fake "root" package from our solution, since nothing but this
-        // module should generally need to be aware it even exists.
-        result.remove(&package);
-
+        let result = resolve(&resolver, package, version).map_err(SolverError::from_pubgrub)?;
         let packages: Packages = result
             .into_iter()
+            // Filter out the root package from our results since nothing but this
+            // module should even be aware it exists.
+            .filter(|(p, _)| !p.is_root())
+            // Turn our (Name, Candidate) into (PackageName, Package)
             .map(|(p, c)| {
                 (
                     p.clone().into(),
