@@ -110,11 +110,6 @@ impl Repository {
             }
         }
 
-        // We want to put the newest version first, this will make sure that our resolver
-        // will do intelligent things, like trying the newest version. Since we ensured
-        // that this Vec was already sorted by repository, and we're using a stable sort
-        // this will put Version -> Repository.
-        candidates.sort_by(|l, r| l.cmp(r).reverse());
         candidates
     }
 }
