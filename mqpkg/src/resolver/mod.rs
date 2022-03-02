@@ -6,8 +6,6 @@ use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::fmt;
 
-use ::pubgrub::error::PubGrubError;
-use ::pubgrub::report::{DefaultStringReporter, Reporter};
 use ::pubgrub::solver::{
     choose_package_with_fewest_versions, resolve, Dependencies as PDependencies, DependencyProvider,
 };
@@ -22,63 +20,11 @@ use crate::resolver::types::WithDependencies;
 pub(crate) use crate::resolver::types::{Name, Requirement, StaticDependencies};
 use crate::types::{Package, Packages, WithSource};
 
+mod errors;
 mod pubgrub;
 mod types;
 
 const LOGNAME: &str = "mqpkg::resolver";
-
-impl SolverError {
-    fn from_pubgrub(err: PubGrubError<Name, VersionSet<Candidate>>) -> Self {
-        match err {
-            PubGrubError::NoSolution(dt) => SolverError::NoSolution(Box::new(dt)),
-            PubGrubError::DependencyOnTheEmptySet {
-                package,
-                version,
-                dependent,
-            } => SolverError::DependencyOnTheEmptySet {
-                package: package.into(),
-                version: Box::new(version),
-                dependent: dependent.into(),
-            },
-            PubGrubError::SelfDependency { package, version } => SolverError::SelfDependency {
-                package: package.into(),
-                version: Box::new(version),
-            },
-            PubGrubError::Failure(s) => SolverError::Failure(s),
-            PubGrubError::ErrorRetrievingDependencies { .. } => SolverError::Impossible,
-            PubGrubError::ErrorChoosingPackageVersion(_) => SolverError::Impossible,
-            PubGrubError::ErrorInShouldCancel(_) => SolverError::Impossible,
-        }
-    }
-
-    pub fn humanized<S: Into<String>>(msg: S, dt: DerivedResult) -> HumanizedNoSolutionError {
-        HumanizedNoSolutionError {
-            msg: msg.into(),
-            dt,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct HumanizedNoSolutionError {
-    msg: String,
-    dt: DerivedResult,
-}
-
-impl fmt::Display for HumanizedNoSolutionError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}\n\n", self.msg.as_str())?;
-        writeln!(f, "{}", DefaultStringReporter::report(&self.dt))?;
-
-        Ok(())
-    }
-}
-
-impl std::error::Error for HumanizedNoSolutionError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
-    }
-}
 
 pub(crate) struct Solver {
     repository: Repository,
