@@ -19,7 +19,7 @@ use crate::repository::Repository;
 pub(crate) use crate::resolver::pubgrub::{Candidate, DerivedResult};
 use crate::resolver::pubgrub::{CandidateTrait, VersionSet};
 use crate::resolver::types::WithDependencies;
-pub(crate) use crate::resolver::types::{Dependencies, Name, Requirement};
+pub(crate) use crate::resolver::types::{Name, Requirement, StaticDependencies};
 use crate::types::{Package, Packages, WithSource};
 
 mod pubgrub;

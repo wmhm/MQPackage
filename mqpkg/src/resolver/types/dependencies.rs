@@ -16,7 +16,7 @@ pub(crate) trait Dependencies: fmt::Debug + DynClone {
 
 dyn_clone::clone_trait_object!(Dependencies);
 
-pub(crate) trait WithDependencies {
+pub(in crate::resolver) trait WithDependencies {
     fn dependencies(&self) -> &dyn Dependencies;
 }
 

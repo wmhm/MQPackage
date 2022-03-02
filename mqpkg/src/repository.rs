@@ -16,7 +16,7 @@ use url::Url;
 
 use crate::config;
 use crate::errors::RepositoryError;
-use crate::resolver::{Candidate, Dependencies, Name, Requirement};
+use crate::resolver::{Candidate, StaticDependencies};
 use crate::types::{PackageName, Source};
 
 const LOGNAME: &str = "mqpkg::repository";
@@ -104,7 +104,7 @@ impl Repository {
                             u64::try_from(idx + 1).unwrap(),
                             repo.clone(),
                         )),
-                        Box::new(RepositoryDependencies::new(release.dependencies.clone())),
+                        Box::new(StaticDependencies::new(release.dependencies.clone())),
                     ));
                 }
             }
@@ -116,28 +116,6 @@ impl Repository {
         // this will put Version -> Repository.
         candidates.sort_by(|l, r| l.cmp(r).reverse());
         candidates
-    }
-}
-
-#[derive(Debug, Clone)]
-struct RepositoryDependencies {
-    dependencies: HashMap<Name, Requirement>,
-}
-
-impl RepositoryDependencies {
-    fn new<N: Into<Name>>(reqs: HashMap<N, VersionReq>) -> RepositoryDependencies {
-        RepositoryDependencies {
-            dependencies: reqs
-                .into_iter()
-                .map(|(k, v)| (k.into(), v.into()))
-                .collect(),
-        }
-    }
-}
-
-impl Dependencies for RepositoryDependencies {
-    fn get(&self) -> HashMap<Name, Requirement> {
-        self.dependencies.clone()
     }
 }
 
