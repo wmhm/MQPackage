@@ -63,9 +63,13 @@ impl Candidate {
     pub(in crate::resolver) fn root<N: Into<Name>, R: Into<Requirement>>(
         reqs: HashMap<N, R>,
     ) -> Candidate {
+        let source = Box::new(InternalSource::new(0));
         Candidate {
-            version: Version::candidate(0, 0, 0),
-            source: Box::new(InternalSource::new(0)),
+            version: Version::candidate(0, 0, 0)
+                .with_source_id(source.id())
+                .with_source_discriminator(source.discriminator())
+                .suppress_display(),
+            source,
             dependencies: Box::new(StaticDependencies::new(
                 reqs.into_iter()
                     .map(|(k, v)| (k.into(), v.into()))

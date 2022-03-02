@@ -182,11 +182,12 @@ impl<'r, 'c> DependencyProvider<Name, VersionSet<Candidate>> for InternalSolver<
             choose_package_with_fewest_versions(|p| self.list_versions(p), potential_packages);
 
         if log_enabled!(log::Level::Trace) {
+            let pkg = package.borrow();
             let version = version
                 .clone()
                 .map(|v| v.to_string())
                 .unwrap_or_else(|| "None".to_string());
-            let version = if version.is_empty() {
+            let version = if pkg.is_root() {
                 "".to_string()
             } else {
                 format!(" ({})", version)
@@ -194,7 +195,7 @@ impl<'r, 'c> DependencyProvider<Name, VersionSet<Candidate>> for InternalSolver<
             trace!(
                 target: LOGNAME,
                 "selected {}{} as next candidate",
-                package.borrow(),
+                pkg,
                 version
             );
         }

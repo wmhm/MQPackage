@@ -14,6 +14,7 @@ pub struct Version {
     version: semver::Version,
     source_id: u64,
     source_discriminator: u64,
+    suppress_display: bool,
 }
 
 impl Version {
@@ -22,6 +23,7 @@ impl Version {
             version: semver::Version::new(major, minor, patch),
             source_id: 0,
             source_discriminator: 0,
+            suppress_display: false,
         }
     }
 
@@ -46,11 +48,20 @@ impl Version {
         self.source_discriminator = source_discriminator;
         self
     }
+
+    pub(in crate::resolver) fn suppress_display(mut self) -> Version {
+        self.suppress_display = true;
+        self
+    }
 }
 
 impl fmt::Display for Version {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.version)
+        if !self.suppress_display {
+            write!(f, "{}", self.version)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -107,6 +118,7 @@ impl From<&semver::Version> for Version {
             version: version.clone(),
             source_id: 0,
             source_discriminator: 0,
+            suppress_display: false,
         }
     }
 }
