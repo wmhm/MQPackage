@@ -84,8 +84,9 @@ meta:
   name: "The Name of the package"
   version: "The version of the package"
   dependencies:
-    dependency: version specifer
-    dependency: version specifier
+    - dependency1
+    - name: dependency2
+      version: version specifier
 
 config_files:
   - relative path with glob
@@ -111,9 +112,19 @@ The version number of this package, must follow the [Semver](https://semver.org/
 
 ### dependencies
 
-A mapping of dependency name to version specifier. The version specifier constrains
-the dependency version so that the dependency must match the constraint. It supports
-the following operations:
+A list of dependencies that this package has, and each entry in this list can take one
+of two forms.
+
+The simple form is just a string that contains the name of the dependency. When used
+in this fashion it is treated as if the specifier was ``*`` and any version is
+acceptable. It is assumed that for most packages, this will be enough due to the
+existing community norms of everyone generally updating everything to the latest
+version regularly.
+
+The more complex form is that each entry in the list is a mapping containing more
+information about the dependency. That mapping supports two keys, ``name``, which
+is just the name of the dependency, and ``version``, which is the version specifier
+of that dependency. The version specifier supports the following operations:
 
 - ``*`` - Matches any version number.
 - ``=`` - "Exact" match (however if you have less than 3 digits in the specifier, it
@@ -132,6 +143,29 @@ the following operations:
 
 For more details, you can check out the Rust
 [Version Op page](https://docs.rs/semver/latest/semver/enum.Op.html).
+
+Since the simple form treats all specifiers as if they were ``*``, these two
+metadata files would be identical:
+
+```yaml
+meta:
+  name: example
+  version: 1.0.0
+  dependencies:
+    - dependency
+```
+
+```yaml
+meta:
+  name: example
+  version: 1.0.0
+  dependencies:
+    - name: dependency
+      version: *
+```
+
+It is an error to define the same dependency twice in this list.
+
 
 ### config_files (Optional)
 
